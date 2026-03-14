@@ -15,9 +15,15 @@ export default function LandlordLayout({
           <div className="flex items-center gap-2">
             <Link
               href="/landlord/dashboard"
-              className="rounded-full bg-zinc-950 px-4 py-2 text-xs font-semibold text-white transition hover:bg-zinc-800 sm:text-sm"
+              className="rounded-full border border-zinc-900/15 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-100 sm:text-sm"
             >
               Dashboard
+            </Link>
+            <Link
+              href="/landlord/maintenance-requests"
+              className="rounded-full bg-zinc-950 px-4 py-2 text-xs font-semibold text-white transition hover:bg-zinc-800 sm:text-sm"
+            >
+              Maintenance
             </Link>
           </div>
         </nav>
