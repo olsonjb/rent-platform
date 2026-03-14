@@ -12,30 +12,38 @@ interface MaintenanceRequest {
   urgency: "habitability" | "standard";
 }
 
-function parseMaintenanceRequest(
+function parseMaintenanceRequests(
   text: string
-): { displayText: string; maintenanceRequest: MaintenanceRequest | null } {
+): { displayText: string; maintenanceRequests: MaintenanceRequest[] } {
   const delimiter = "|||MAINTENANCE_REQUEST|||";
   const endDelimiter = "|||END|||";
 
-  const startIdx = text.indexOf(delimiter);
-  if (startIdx === -1) return { displayText: text.trim(), maintenanceRequest: null };
+  const firstIdx = text.indexOf(delimiter);
+  if (firstIdx === -1) return { displayText: text.trim(), maintenanceRequests: [] };
 
-  const displayText = text.slice(0, startIdx).trim();
-  const jsonStart = startIdx + delimiter.length;
-  const jsonEnd = text.indexOf(endDelimiter, jsonStart);
-  const jsonStr = text.slice(jsonStart, jsonEnd === -1 ? undefined : jsonEnd).trim();
+  const displayText = text.slice(0, firstIdx).trim();
+  const requests: MaintenanceRequest[] = [];
 
-  try {
-    const parsed = JSON.parse(jsonStr);
-    if (parsed.issue && parsed.urgency) {
-      return { displayText, maintenanceRequest: parsed as MaintenanceRequest };
+  let searchFrom = 0;
+  while (true) {
+    const start = text.indexOf(delimiter, searchFrom);
+    if (start === -1) break;
+    const jsonStart = start + delimiter.length;
+    const end = text.indexOf(endDelimiter, jsonStart);
+    if (end === -1) break;
+    const jsonStr = text.slice(jsonStart, end).trim();
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.issue && parsed.urgency) {
+        requests.push(parsed as MaintenanceRequest);
+      }
+    } catch {
+      // ignore malformed block
     }
-  } catch {
-    // ignore
+    searchFrom = end + endDelimiter.length;
   }
 
-  return { displayText, maintenanceRequest: null };
+  return { displayText, maintenanceRequests: requests };
 }
 
 function twimlReply(message: string): NextResponse {
@@ -121,15 +129,15 @@ export async function POST(request: NextRequest) {
   const rawReply =
     response.content[0].type === "text" ? response.content[0].text : "";
 
-  const { displayText, maintenanceRequest } = parseMaintenanceRequest(rawReply);
+  const { displayText, maintenanceRequests } = parseMaintenanceRequests(rawReply);
 
-  // If maintenance request detected, insert it and notify landlord
-  if (maintenanceRequest) {
+  // Insert all detected maintenance requests and notify landlord
+  for (const mr of maintenanceRequests) {
     await supabase.from("maintenance_requests").insert({
       tenant_id: tenant.id,
       unit: tenant.unit,
-      issue: maintenanceRequest.issue,
-      urgency: maintenanceRequest.urgency,
+      issue: mr.issue,
+      urgency: mr.urgency,
       status: "pending",
     });
 
@@ -139,10 +147,10 @@ export async function POST(request: NextRequest) {
         unit: tenant.unit,
         tenantName: tenant.name,
         tenantPhone: tenant.phone ?? null,
-        issue: maintenanceRequest.issue,
-        urgency: maintenanceRequest.urgency,
+        issue: mr.issue,
+        urgency: mr.urgency,
       });
-      await sendSms(toE164(property.manager_phone), landlordMsg).catch((err) =>
+      await sendSms(property.manager_phone, landlordMsg).catch((err) =>
         console.error("Failed to SMS landlord:", err)
       );
     }
