@@ -56,105 +56,118 @@ export async function runListingAgent(): Promise<ListingAgentResult[]> {
   }
 
   for (const lease of expiringLeases as unknown as ExpiringLease[]) {
-    // Check if listing already exists for this lease
-    const { data: existingListing } = await supabase
-      .from('listings')
-      .select('id')
-      .eq('lease_id', lease.id)
-      .in('status', ['pending', 'active'])
-      .limit(1);
+    try {
+      // Check if listing already exists for this lease
+      const { data: existingListing } = await supabase
+        .from('listings')
+        .select('id')
+        .eq('lease_id', lease.id)
+        .in('status', ['pending', 'active'])
+        .limit(1);
 
-    if (existingListing && existingListing.length > 0) {
-      continue; // Skip — already has a listing
-    }
+      if (existingListing && existingListing.length > 0) {
+        continue; // Skip — already has a listing
+      }
 
-    const prop = lease.properties;
-    const tenant = lease.landlord_tenants;
+      const prop = lease.properties;
+      const tenant = lease.landlord_tenants;
 
-    // Step 1: AI Decision
-    const decision = await makeListingDecision({
-      property: {
-        address: prop.address,
-        city: prop.city,
-        state: prop.state,
-        zip: prop.zip,
-        bedrooms: prop.bedrooms,
-        bathrooms: prop.bathrooms,
-        sqft: prop.sqft,
-        monthly_rent: prop.monthly_rent,
-      },
-      lease: {
-        end_date: lease.end_date,
-        monthly_rent: lease.monthly_rent,
-        tenant_name: tenant.name,
-        renewal_offered: lease.renewal_offered,
-      },
-    });
+      // Step 1: AI Decision
+      const decision = await makeListingDecision({
+        property: {
+          address: prop.address,
+          city: prop.city,
+          state: prop.state,
+          zip: prop.zip,
+          bedrooms: prop.bedrooms,
+          bathrooms: prop.bathrooms,
+          sqft: prop.sqft,
+          monthly_rent: prop.monthly_rent,
+        },
+        lease: {
+          end_date: lease.end_date,
+          monthly_rent: lease.monthly_rent,
+          tenant_name: tenant.name,
+          renewal_offered: lease.renewal_offered,
+        },
+      });
 
-    if (!decision.should_list) {
-      results.push({ leaseId: lease.id, propertyAddress: prop.address, decision });
-      continue;
-    }
+      if (!decision.should_list) {
+        results.push({ leaseId: lease.id, propertyAddress: prop.address, decision });
+        continue;
+      }
 
-    // Step 2: Generate content
-    const content = await generateListingContent({
-      property: {
-        address: prop.address,
-        city: prop.city,
-        state: prop.state,
-        zip: prop.zip,
-        bedrooms: prop.bedrooms,
-        bathrooms: prop.bathrooms,
-        sqft: prop.sqft,
-      },
-      suggestedRent: decision.suggested_rent ?? lease.monthly_rent,
-    });
+      // Step 2: Generate content
+      const content = await generateListingContent({
+        property: {
+          address: prop.address,
+          city: prop.city,
+          state: prop.state,
+          zip: prop.zip,
+          bedrooms: prop.bedrooms,
+          bathrooms: prop.bathrooms,
+          sqft: prop.sqft,
+        },
+        suggestedRent: decision.suggested_rent ?? lease.monthly_rent,
+      });
 
-    // Step 3: Submit to providers
-    const providerListing: PropertyListing = {
-      title: content.title,
-      description: content.description,
-      highlights: content.highlights,
-      rent: decision.suggested_rent ?? lease.monthly_rent,
-      bedrooms: prop.bedrooms ?? 0,
-      bathrooms: prop.bathrooms ?? 1,
-      sqft: prop.sqft,
-      address: prop.address,
-      city: prop.city ?? 'Unknown',
-      state: prop.state ?? 'Unknown',
-      zip: prop.zip ?? '00000',
-    };
-
-    const providerResults = await submitToProviders(providerListing);
-
-    const anySuccess = providerResults.some((r) => r.success);
-
-    // Step 4: Save to DB
-    const { data: listing } = await supabase
-      .from('listings')
-      .insert({
-        property_id: lease.property_id,
-        lease_id: lease.id,
-        status: anySuccess ? 'active' : 'error',
-        ai_decision: decision,
-        ai_content: content,
-        suggested_rent: decision.suggested_rent,
+      // Step 3: Submit to providers
+      const providerListing: PropertyListing = {
         title: content.title,
         description: content.description,
         highlights: content.highlights,
-        provider_results: providerResults,
-      })
-      .select('id')
-      .single();
+        rent: decision.suggested_rent ?? lease.monthly_rent,
+        bedrooms: prop.bedrooms ?? 0,
+        bathrooms: prop.bathrooms ?? 1,
+        sqft: prop.sqft,
+        address: prop.address,
+        city: prop.city ?? 'Unknown',
+        state: prop.state ?? 'Unknown',
+        zip: prop.zip ?? '00000',
+      };
 
-    results.push({
-      leaseId: lease.id,
-      propertyAddress: prop.address,
-      decision,
-      content,
-      listingId: listing?.id,
-      providerResults,
-    });
+      const providerResults = await submitToProviders(providerListing);
+
+      const anySuccess = providerResults.some((r) => r.success);
+
+      // Step 4: Save to DB
+      const { data: listing, error: insertError } = await supabase
+        .from('listings')
+        .insert({
+          property_id: lease.property_id,
+          lease_id: lease.id,
+          status: anySuccess ? 'active' : 'error',
+          ai_decision: decision,
+          ai_content: content,
+          suggested_rent: decision.suggested_rent,
+          title: content.title,
+          description: content.description,
+          highlights: content.highlights,
+          provider_results: providerResults,
+        })
+        .select('id')
+        .single();
+
+      if (insertError) {
+        console.error(`[listing-agent] DB insert failed for lease ${lease.id}:`, insertError);
+      }
+
+      results.push({
+        leaseId: lease.id,
+        propertyAddress: prop.address,
+        decision,
+        content,
+        listingId: listing?.id,
+        providerResults,
+      });
+    } catch (err) {
+      console.error(`[listing-agent] Error processing lease ${lease.id}:`, err);
+      results.push({
+        leaseId: lease.id,
+        propertyAddress: lease.properties?.address ?? 'unknown',
+        decision: { should_list: false, reasoning: `Agent error: ${err}`, suggested_rent: null, urgency: 'low' },
+      });
+    }
   }
 
   return results;
