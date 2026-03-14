@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import {
   MAINTENANCE_REQUEST_STATUSES,
   MAINTENANCE_REQUEST_STATUS_LABELS,
@@ -9,17 +10,18 @@ import { createClient } from "@/lib/supabase/server";
 
 type MaintenanceRequestHistoryRow = {
   id: string;
-  issue_title: string;
-  location: string;
+  issue: string;
+  unit: string;
+  location: string | null;
   urgency: string;
   status: string;
   created_at: string;
 };
 
 const STATUS_BADGE_STYLES: Record<MaintenanceRequestStatus, string> = {
-  submitted: "bg-sky-100 text-sky-900",
+  pending: "bg-sky-100 text-sky-900",
   in_progress: "bg-amber-100 text-amber-900",
-  resolved: "bg-emerald-100 text-emerald-900",
+  completed: "bg-emerald-100 text-emerald-900",
 };
 
 const LOCATION_LABELS: Record<string, string> = {
@@ -32,9 +34,8 @@ const LOCATION_LABELS: Record<string, string> = {
 };
 
 const URGENCY_LABELS: Record<string, string> = {
-  emergency: "Emergency",
-  high: "High",
-  normal: "Normal",
+  habitability: "Habitability",
+  standard: "Standard",
 };
 
 const formatDate = (value: string) => {
@@ -54,14 +55,22 @@ const getKnownStatus = (status: string): MaintenanceRequestStatus => {
     return "in_progress";
   }
 
-  if (status === "resolved") {
-    return "resolved";
+  if (status === "completed") {
+    return "completed";
   }
 
-  return "submitted";
+  return "pending";
 };
 
 export default async function MaintenanceRequestHistoryPage() {
+  return (
+    <Suspense fallback={<MaintenanceRequestHistoryFallback />}>
+      <MaintenanceRequestHistoryContent />
+    </Suspense>
+  );
+}
+
+async function MaintenanceRequestHistoryContent() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -74,8 +83,8 @@ export default async function MaintenanceRequestHistoryPage() {
 
   const { data, error } = await supabase
     .from("maintenance_requests")
-    .select("id, issue_title, location, urgency, status, created_at")
-    .eq("renter_user_id", user.id)
+    .select("id, issue, unit, location, urgency, status, created_at")
+    .eq("tenant_id", user.id)
     .order("created_at", { ascending: false });
 
   const requests: MaintenanceRequestHistoryRow[] = Array.isArray(data)
@@ -83,9 +92,9 @@ export default async function MaintenanceRequestHistoryPage() {
     : [];
 
   const requestsByStatus: Record<MaintenanceRequestStatus, MaintenanceRequestHistoryRow[]> = {
-    submitted: [],
+    pending: [],
     in_progress: [],
-    resolved: [],
+    completed: [],
   };
 
   for (const request of requests) {
@@ -149,11 +158,16 @@ export default async function MaintenanceRequestHistoryPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
                       <h3 className="text-base font-semibold tracking-tight text-zinc-950">
-                        {request.issue_title}
+                        {request.issue}
                       </h3>
                       <p className="text-sm text-zinc-600">
-                        {LOCATION_LABELS[request.location] ?? request.location} - {URGENCY_LABELS[request.urgency] ?? request.urgency} urgency
+                        Unit {request.unit} - {URGENCY_LABELS[request.urgency] ?? request.urgency}
                       </p>
+                      {request.location ? (
+                        <p className="text-sm text-zinc-500">
+                          Location: {LOCATION_LABELS[request.location] ?? request.location}
+                        </p>
+                      ) : null}
                     </div>
                     <span
                       className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${STATUS_BADGE_STYLES[getKnownStatus(request.status)]}`}
@@ -168,6 +182,16 @@ export default async function MaintenanceRequestHistoryPage() {
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function MaintenanceRequestHistoryFallback() {
+  return (
+    <div className="mx-auto w-full max-w-4xl space-y-4">
+      <div className="h-8 w-56 animate-pulse rounded bg-zinc-200" />
+      <div className="h-24 animate-pulse rounded-2xl bg-zinc-100" />
+      <div className="h-24 animate-pulse rounded-2xl bg-zinc-100" />
     </div>
   );
 }

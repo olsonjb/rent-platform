@@ -9,7 +9,7 @@ export const MAINTENANCE_REQUEST_LOCATIONS = [
 
 export type MaintenanceRequestLocation = (typeof MAINTENANCE_REQUEST_LOCATIONS)[number];
 
-export const MAINTENANCE_REQUEST_URGENCIES = ["emergency", "high", "normal"] as const;
+export const MAINTENANCE_REQUEST_URGENCIES = ["habitability", "standard"] as const;
 
 export type MaintenanceRequestUrgency = (typeof MAINTENANCE_REQUEST_URGENCIES)[number];
 
@@ -18,14 +18,14 @@ export const MAINTENANCE_REQUEST_ENTRY_PERMISSIONS = ["can-enter", "present-only
 export type MaintenanceRequestEntryPermission =
   (typeof MAINTENANCE_REQUEST_ENTRY_PERMISSIONS)[number];
 
-export const MAINTENANCE_REQUEST_STATUSES = ["submitted", "in_progress", "resolved"] as const;
+export const MAINTENANCE_REQUEST_STATUSES = ["pending", "in_progress", "completed"] as const;
 
 export type MaintenanceRequestStatus = (typeof MAINTENANCE_REQUEST_STATUSES)[number];
 
 export const MAINTENANCE_REQUEST_STATUS_LABELS: Record<MaintenanceRequestStatus, string> = {
-  submitted: "Submitted",
+  pending: "Pending",
   in_progress: "In progress",
-  resolved: "Resolved",
+  completed: "Completed",
 };
 
 export const isMaintenanceRequestLocation = (

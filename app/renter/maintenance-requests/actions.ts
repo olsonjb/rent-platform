@@ -20,6 +20,7 @@ const redirectWithError = (message: string): never => {
 
 export async function createMaintenanceRequest(formData: FormData) {
   const issueTitleValue = formData.get("issueTitle");
+  const unitValue = formData.get("unit");
   const locationValue = formData.get("location");
   const urgencyValue = formData.get("urgency");
   const detailsValue = formData.get("details");
@@ -29,6 +30,10 @@ export async function createMaintenanceRequest(formData: FormData) {
   const issueTitle = isNonEmptyString(issueTitleValue)
     ? issueTitleValue.trim()
     : redirectWithError("Please add an issue title.");
+
+  const unit = isNonEmptyString(unitValue)
+    ? unitValue.trim()
+    : redirectWithError("Please add your unit number.");
 
   if (!isMaintenanceRequestLocation(locationValue)) {
     redirectWithError("Please choose a valid location.");
@@ -61,8 +66,9 @@ export async function createMaintenanceRequest(formData: FormData) {
   }
 
   const { error } = await supabase.from("maintenance_requests").insert({
-    renter_user_id: user.id,
-    issue_title: issueTitle,
+    tenant_id: user.id,
+    issue: issueTitle,
+    unit,
     location: locationValue,
     urgency: urgencyValue,
     details,

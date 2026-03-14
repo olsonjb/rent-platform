@@ -17,9 +17,8 @@ const LOCATION_LABELS: Record<(typeof MAINTENANCE_REQUEST_LOCATIONS)[number], st
 };
 
 const URGENCY_LABELS: Record<(typeof MAINTENANCE_REQUEST_URGENCIES)[number], string> = {
-  emergency: "Emergency (active leak, no heat, safety risk)",
-  high: "High (same-day preferred)",
-  normal: "Normal (within 2 to 3 days)",
+  habitability: "Habitability (health/safety concern)",
+  standard: "Standard (non-emergency)",
 };
 
 const ENTRY_PERMISSION_LABELS: Record<
@@ -89,6 +88,20 @@ async function NewMaintenanceRequestContent({
             type="text"
             required
             placeholder="Example: Kitchen sink leaking"
+            className="h-10 w-full rounded-md border border-zinc-300 px-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-900"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="unit" className="text-sm font-medium text-zinc-900">
+            Unit number
+          </label>
+          <input
+            id="unit"
+            name="unit"
+            type="text"
+            required
+            placeholder="Example: 2B"
             className="h-10 w-full rounded-md border border-zinc-300 px-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-900"
           />
         </div>
