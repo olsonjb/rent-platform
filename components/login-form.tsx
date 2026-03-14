@@ -15,11 +15,17 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  USER_TYPE_LABELS,
+  getUserTypeFromMetadata,
+  type UserType,
+} from "@/lib/auth/user-types";
 
 export function LoginForm({
   className,
+  userType,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & { userType: UserType }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +44,18 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const accountType = getUserTypeFromMetadata(user?.user_metadata);
+
+      if (accountType !== userType) {
+        await supabase.auth.signOut();
+        setError(`This account is not registered as a ${USER_TYPE_LABELS[userType]}.`);
+        return;
+      }
+
       // Update this route to redirect to an authenticated route. The user already has an active session.
       router.push("/protected");
     } catch (error: unknown) {
@@ -49,11 +67,11 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="rounded-2xl border-zinc-900/10 bg-white shadow-[0_24px_64px_-36px_rgba(0,0,0,0.4)]">
         <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
+          <CardTitle className="text-2xl tracking-tight text-zinc-950">Sign in</CardTitle>
           <CardDescription>
-            Enter your email below to login to your account
+            Enter your email and password to access Auto PM.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -64,18 +82,24 @@ export function LoginForm({
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder="you@company.com"
+                  className="border-zinc-900/15"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               <div className="grid gap-2">
+                <p className="rounded-md bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-900">
+                  Signing in as {USER_TYPE_LABELS[userType]}
+                </p>
+              </div>
+              <div className="grid gap-2">
                 <div className="flex items-center">
                   <Label htmlFor="password">Password</Label>
                   <Link
                     href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                    className="ml-auto inline-block text-sm text-zinc-600 underline-offset-4 hover:text-zinc-950 hover:underline"
                   >
                     Forgot your password?
                   </Link>
@@ -83,21 +107,26 @@ export function LoginForm({
                 <Input
                   id="password"
                   type="password"
+                  className="border-zinc-900/15"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
+              <Button
+                type="submit"
+                className="w-full bg-zinc-950 text-white hover:bg-zinc-800"
+                disabled={isLoading}
+              >
+                {isLoading ? "Signing in..." : "Sign in"}
               </Button>
             </div>
-            <div className="mt-4 text-center text-sm">
+            <div className="mt-4 text-center text-sm text-zinc-600">
               Don&apos;t have an account?{" "}
               <Link
                 href="/auth/sign-up"
-                className="underline underline-offset-4"
+                className="font-medium text-zinc-900 underline underline-offset-4"
               >
                 Sign up
               </Link>

@@ -44,11 +44,11 @@ export function UpdatePasswordForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="rounded-2xl border-zinc-900/10 bg-white shadow-[0_24px_64px_-36px_rgba(0,0,0,0.4)]">
         <CardHeader>
-          <CardTitle className="text-2xl">Reset Your Password</CardTitle>
+          <CardTitle className="text-2xl tracking-tight text-zinc-950">Reset your password</CardTitle>
           <CardDescription>
-            Please enter your new password below.
+            Enter a new password to secure your Auto PM account.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -60,13 +60,18 @@ export function UpdatePasswordForm({
                   id="password"
                   type="password"
                   placeholder="New password"
+                  className="border-zinc-900/15"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full bg-zinc-950 text-white hover:bg-zinc-800"
+                disabled={isLoading}
+              >
                 {isLoading ? "Saving..." : "Save new password"}
               </Button>
             </div>

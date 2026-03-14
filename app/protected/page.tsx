@@ -4,6 +4,24 @@ import { createClient } from "@/lib/supabase/server";
 import { InfoIcon } from "lucide-react";
 import { FetchDataSteps } from "@/components/tutorial/fetch-data-steps";
 import { Suspense } from "react";
+import { USER_TYPE_LABELS, USER_TYPES, type UserType } from "@/lib/auth/user-types";
+
+const getUserTypeFromClaims = (claims: Record<string, unknown>): UserType | null => {
+  const metadata = claims.user_metadata;
+
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+
+  const metadataWithUserType = metadata as { userType?: unknown; role?: unknown };
+  const value = metadataWithUserType.userType ?? metadataWithUserType.role;
+
+  if (typeof value === "string" && USER_TYPES.includes(value as UserType)) {
+    return value as UserType;
+  }
+
+  return null;
+};
 
 async function UserDetails() {
   const supabase = await createClient();
@@ -14,6 +32,23 @@ async function UserDetails() {
   }
 
   return JSON.stringify(data.claims, null, 2);
+}
+
+async function UserTypeBadge() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.getClaims();
+
+  if (error || !data?.claims) {
+    redirect("/auth/login");
+  }
+
+  const userType = getUserTypeFromClaims(data.claims as Record<string, unknown>);
+
+  return (
+    <p className="rounded-md bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-900">
+      Account type: {userType ? USER_TYPE_LABELS[userType] : "Unassigned"}
+    </p>
+  );
 }
 
 export default function ProtectedPage() {
@@ -28,6 +63,9 @@ export default function ProtectedPage() {
       </div>
       <div className="flex flex-col gap-2 items-start">
         <h2 className="font-bold text-2xl mb-4">Your user details</h2>
+        <Suspense>
+          <UserTypeBadge />
+        </Suspense>
         <pre className="text-xs font-mono p-3 rounded border max-h-32 overflow-auto">
           <Suspense>
             <UserDetails />

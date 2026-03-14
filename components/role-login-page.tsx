@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { SignUpForm } from "@/components/sign-up-form";
+import { LoginForm } from "@/components/login-form";
+import { USER_TYPE_LABELS, type UserType } from "@/lib/auth/user-types";
 
-export default function Page() {
+export function RoleLoginPage({ userType }: { userType: UserType }) {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_hsl(151_45%_94%),_hsl(0_0%_100%))]">
       <div className="mx-auto flex w-full max-w-6xl flex-col px-5 pb-12 pt-6 sm:px-8">
@@ -14,18 +15,24 @@ export default function Page() {
         <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
           <section className="max-w-xl space-y-4">
             <p className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-900">
-              Get started
+              {USER_TYPE_LABELS[userType]} login
             </p>
             <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-              Create your Auto PM workspace.
+              Sign in to your {userType} account.
             </h1>
             <p className="text-sm leading-relaxed text-zinc-600 sm:text-base">
-              Create a landlord or renter account to launch maintenance requests and communications in minutes.
+              Enter your credentials to continue to Auto PM.
             </p>
+            <Link
+              href="/auth/login"
+              className="inline-block text-sm font-medium text-zinc-700 underline underline-offset-4 hover:text-zinc-950"
+            >
+              Switch login type
+            </Link>
           </section>
 
           <div className="w-full max-w-md">
-            <SignUpForm />
+            <LoginForm userType={userType} />
           </div>
         </div>
       </div>
