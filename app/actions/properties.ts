@@ -25,6 +25,7 @@ export async function createProperty(formData: FormData) {
 
   const { error } = await supabase.from('properties').insert({
     landlord_id: user.id,
+    name: formData.get('name') as string,
     address: formData.get('address') as string,
     city: formData.get('city') as string,
     state: formData.get('state') as string,

@@ -2,23 +2,32 @@ export type LeaseStatus = 'active' | 'pending' | 'expired' | 'terminated';
 
 export interface Property {
   id: string;
-  landlord_id: string;
+  name: string;
   address: string;
-  city: string;
-  state: string;
-  zip: string;
-  bedrooms: number;
-  bathrooms: number;
-  monthly_rent: number;
+  rent_due_day?: number;
+  parking_policy?: string | null;
+  pet_policy?: string | null;
+  quiet_hours?: string | null;
+  lease_terms?: string | null;
+  manager_name?: string | null;
+  manager_phone?: string | null;
+  landlord_id?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  monthly_rent?: number | null;
   created_at: string;
 }
 
-export interface Tenant {
+export interface LandlordTenant {
   id: string;
   landlord_id: string;
   name: string;
   email: string;
   phone: string | null;
+  auth_user_id?: string | null;
   created_at: string;
 }
 
@@ -37,10 +46,10 @@ export interface Lease {
 export interface LeaseWithRelations extends Lease {
   properties: {
     address: string;
-    city: string;
-    state: string;
+    city: string | null;
+    state: string | null;
   };
-  tenants: {
+  landlord_tenants: {
     name: string;
     email: string;
   };

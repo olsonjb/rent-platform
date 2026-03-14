@@ -11,7 +11,7 @@ export async function getLeases(): Promise<LeaseWithRelations[]> {
 
   const { data, error } = await supabase
     .from('leases')
-    .select('*, properties(address, city, state), tenants(name, email)')
+    .select('*, properties(address, city, state), landlord_tenants(name, email)')
     .order('created_at', { ascending: false });
 
   if (error) throw error;

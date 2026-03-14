@@ -39,8 +39,8 @@ export default async function LeasesPage() {
               <p className="text-sm text-muted-foreground">
                 {l.properties.city}, {l.properties.state}
               </p>
-              <p className="text-sm">{l.tenants.name}</p>
-              <p className="text-xs text-muted-foreground">{l.tenants.email}</p>
+              <p className="text-sm">{l.landlord_tenants.name}</p>
+              <p className="text-xs text-muted-foreground">{l.landlord_tenants.email}</p>
               <p className="text-sm font-medium">${l.monthly_rent.toLocaleString()}/mo</p>
               <p className="text-xs text-muted-foreground">
                 {l.start_date} → {l.end_date}

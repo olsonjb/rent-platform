@@ -29,7 +29,7 @@ export default async function PropertiesPage() {
               <p className="text-sm">
                 {p.bedrooms} bed · {p.bathrooms} bath
               </p>
-              <p className="text-sm font-medium">${p.monthly_rent.toLocaleString()}/mo</p>
+              <p className="text-sm font-medium">${p.monthly_rent?.toLocaleString() ?? '—'}/mo</p>
             </Link>
           ))}
         </div>
