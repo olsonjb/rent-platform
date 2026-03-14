@@ -17,7 +17,10 @@ function getTwilioPhone() {
 
 export async function sendSms(to: string, body: string) {
   const client = getClient();
-  await client.messages.create({ from: getTwilioPhone(), to, body });
+  const from = to.startsWith("whatsapp:")
+    ? `whatsapp:${getTwilioPhone()}`
+    : getTwilioPhone();
+  await client.messages.create({ from, to, body });
 }
 
 /** Normalize any common phone format to E.164 (+1XXXXXXXXXX for US numbers) */
@@ -26,6 +29,16 @@ export function toE164(phone: string): string {
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
   return `+${digits}`;
+}
+
+/**
+ * Normalize a Twilio From field for tenant lookup.
+ * WhatsApp messages arrive as "whatsapp:+18013101554" — stored as-is in DB.
+ * SMS messages arrive as "+18013101554" — stored as E.164.
+ */
+export function normalizeFromForLookup(from: string): string {
+  if (from.startsWith("whatsapp:")) return from;
+  return toE164(from);
 }
 
 export function buildLandlordSms(opts: {
