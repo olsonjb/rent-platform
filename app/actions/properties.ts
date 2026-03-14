@@ -52,6 +52,39 @@ const redirectToPropertiesWithStatus = (key: 'link_error' | 'link_success', mess
   redirect(`/protected/properties?${params.toString()}`);
 };
 
+const getAuthUserIdByEmail = async (
+  email: string,
+): Promise<{ userId: string | null; lookupError: boolean }> => {
+  const serviceClient = createServiceClient();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  let page = 1;
+  while (page <= 10) {
+    const { data, error } = await serviceClient.auth.admin.listUsers({ page, perPage: 200 });
+
+    if (error) {
+      return { userId: null, lookupError: true };
+    }
+
+    const users = data?.users ?? [];
+    const matchedUser = users.find(
+      (existingUser) => existingUser.email?.trim().toLowerCase() === normalizedEmail,
+    );
+
+    if (matchedUser?.id) {
+      return { userId: matchedUser.id, lookupError: false };
+    }
+
+    if (users.length < 200) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return { userId: null, lookupError: false };
+};
+
 export async function linkRenterToProperty(formData: FormData) {
   const propertyIdValue = formData.get('property_id');
   const landlordTenantIdValue = formData.get('landlord_tenant_id');
@@ -101,25 +134,19 @@ export async function linkRenterToProperty(formData: FormData) {
   const selectedTenant =
     landlordTenant ?? redirectToPropertiesWithStatus('link_error', 'Selected tenant was not found.');
 
-  const serviceClient = createServiceClient();
-
   let renterId = selectedTenant.auth_user_id;
 
   if (!renterId) {
-    const normalizedEmail = selectedTenant.email.trim().toLowerCase();
-    const { data: authUser, error: authUserError } = await serviceClient
-      .schema('auth')
-      .from('users')
-      .select('id')
-      .eq('email', normalizedEmail)
-      .maybeSingle();
+    const { userId: matchedAuthUserId, lookupError } = await getAuthUserIdByEmail(
+      selectedTenant.email,
+    );
 
-    if (authUserError) {
+    if (lookupError) {
       redirectToPropertiesWithStatus('link_error', 'Unable to validate tenant account right now.');
     }
 
     const authUserId =
-      authUser?.id ??
+      matchedAuthUserId ??
       redirectToPropertiesWithStatus(
         'link_error',
         `No renter account found for ${selectedTenant.email}. Ask them to sign up first.`,
@@ -137,6 +164,8 @@ export async function linkRenterToProperty(formData: FormData) {
       redirectToPropertiesWithStatus('link_error', 'Unable to save tenant account link right now.');
     }
   }
+
+  const serviceClient = createServiceClient();
 
   const { data: tenant, error: tenantLookupError } = await serviceClient
     .from('tenants')
