@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getStripe, getStripeMode } from '@/lib/stripe';
 
@@ -123,16 +124,27 @@ export async function activateDemoTrial() {
   const trialEnd = new Date();
   trialEnd.setDate(trialEnd.getDate() + 30);
 
-  await supabase.from('profiles').upsert(
-    {
-      id: user.id,
-      email: user.email,
+  // Ensure the profile row exists before updating — upsert with only the
+  // identity columns so we never conflict on stripe_customer_id uniqueness.
+  await supabase
+    .from('profiles')
+    .upsert({ id: user.id, email: user.email }, { onConflict: 'id' });
+
+  // Use a targeted update (not upsert) so RLS UPDATE policy applies cleanly
+  // and we don't risk silent failures from INSERT-path constraint checks.
+  const { error } = await supabase
+    .from('profiles')
+    .update({
       payment_status: 'demo_trial',
       trial_ends_at: trialEnd.toISOString(),
-    },
-    { onConflict: 'id' },
-  );
+    })
+    .eq('id', user.id);
 
+  if (error) {
+    throw new Error(`Failed to activate demo trial: ${error.message}`);
+  }
+
+  revalidatePath('/landlord/dashboard');
   redirect('/landlord/dashboard');
 }
 
