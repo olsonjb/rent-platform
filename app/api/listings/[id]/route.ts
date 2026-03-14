@@ -15,7 +15,8 @@ export async function GET(
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 404 });
+    const status = error.code === 'PGRST116' ? 404 : 500;
+    return NextResponse.json({ error: error.message }, { status });
   }
 
   return NextResponse.json(data);
@@ -27,7 +28,12 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const supabase = await createClient();
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
 
   const allowed = ['status', 'title', 'description', 'highlights', 'suggested_rent'];
   const updates: Record<string, unknown> = {};

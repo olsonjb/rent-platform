@@ -69,3 +69,22 @@ CREATE POLICY "Service role full access on listings" ON public.listings
   FOR ALL
   USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
+
+-- Landlords can update their own listings (via property ownership)
+CREATE POLICY "Landlords can update own listings" ON public.listings
+  FOR UPDATE
+  USING (
+    property_id IN (
+      SELECT id FROM public.properties WHERE landlord_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    property_id IN (
+      SELECT id FROM public.properties WHERE landlord_id = auth.uid()
+    )
+  );
+
+-- Prevent duplicate listings for the same lease (only one pending or active at a time)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_listings_unique_active_lease
+  ON public.listings (lease_id)
+  WHERE status IN ('pending', 'active');

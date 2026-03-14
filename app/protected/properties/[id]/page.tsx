@@ -81,7 +81,9 @@ async function PropertyDetail({ id }: { id: string }) {
       )}
 
       {/* Active Listings */}
-      <ListingsSection propertyId={id} />
+      <Suspense fallback={<p className="text-muted-foreground text-sm">Loading listings…</p>}>
+        <ListingsSection propertyId={id} />
+      </Suspense>
 
       {/* All leases */}
       {leases && leases.length > 0 && (
