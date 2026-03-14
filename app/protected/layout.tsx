@@ -31,6 +31,12 @@ export default function ProtectedLayout({
               <Link href="/protected/leases" className="text-muted-foreground hover:text-foreground transition-colors font-normal">
                 Leases
               </Link>
+              <Link href="/landlord/dashboard" className="text-muted-foreground hover:text-foreground transition-colors font-normal">
+                Dashboard
+              </Link>
+              <Link href="/landlord/maintenance-requests" className="text-muted-foreground hover:text-foreground transition-colors font-normal">
+                Maintenance
+              </Link>
             </div>
             {hasEnvVars && (
               <Suspense>
