@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import type { Lease } from '@/lib/types';
+import type { Lease, Listing } from '@/lib/types';
 import { Suspense } from 'react';
 
 interface PageProps {
@@ -80,6 +80,9 @@ async function PropertyDetail({ id }: { id: string }) {
         </div>
       )}
 
+      {/* Active Listings */}
+      <ListingsSection propertyId={id} />
+
       {/* All leases */}
       {leases && leases.length > 0 && (
         <div className="flex flex-col gap-3">
@@ -99,6 +102,60 @@ async function PropertyDetail({ id }: { id: string }) {
         </div>
       )}
     </>
+  );
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  active: 'bg-green-100 text-green-800',
+  pending: 'bg-yellow-100 text-yellow-800',
+  error: 'bg-red-100 text-red-800',
+  rejected: 'bg-gray-100 text-gray-800',
+  expired: 'bg-gray-100 text-gray-500',
+};
+
+async function ListingsSection({ propertyId }: { propertyId: string }) {
+  const supabase = await createClient();
+  const { data: listings } = await supabase
+    .from('listings')
+    .select('*')
+    .eq('property_id', propertyId)
+    .order('created_at', { ascending: false });
+
+  if (!listings || listings.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h2 className="font-semibold">Auto-Listings</h2>
+      {(listings as Listing[]).map((listing) => (
+        <div key={listing.id} className="border rounded-lg p-4 flex flex-col gap-2">
+          <div className="flex justify-between items-center">
+            <span className="font-medium text-sm">{listing.title ?? 'Untitled Listing'}</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[listing.status] ?? 'bg-muted text-muted-foreground'}`}>
+              {listing.status}
+            </span>
+          </div>
+          {listing.suggested_rent && (
+            <p className="text-sm text-muted-foreground">Suggested rent: ${Number(listing.suggested_rent).toLocaleString()}/mo</p>
+          )}
+          {listing.ai_decision?.reasoning && (
+            <p className="text-xs text-muted-foreground">AI reasoning: {listing.ai_decision.reasoning}</p>
+          )}
+          {listing.provider_results && listing.provider_results.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-1">
+              {listing.provider_results.map((pr, i) => (
+                <span key={i} className="text-xs">
+                  {pr.success ? '✓' : '✗'} {pr.provider}
+                  {pr.listingUrl && (
+                    <> — <a href={pr.listingUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">{pr.provider}</a></>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">Created: {new Date(listing.created_at).toLocaleDateString()}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
