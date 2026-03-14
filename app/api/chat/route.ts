@@ -1,54 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
+import { parseMaintenanceRequests } from "@/lib/chat/parse-maintenance";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, buildLandlordSms } from "@/lib/twilio/sms";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
-const anthropic = new Anthropic();
-
-interface MaintenanceRequest {
-  issue: string;
-  urgency: "habitability" | "standard";
-}
-
-function parseMaintenanceRequests(
-  text: string
-): { displayText: string; maintenanceRequests: MaintenanceRequest[] } {
-  const delimiter = "|||MAINTENANCE_REQUEST|||";
-  const endDelimiter = "|||END|||";
-
-  const firstIdx = text.indexOf(delimiter);
-  if (firstIdx === -1) return { displayText: text.trim(), maintenanceRequests: [] };
-
-  const displayText = text.slice(0, firstIdx).trim();
-  const requests: MaintenanceRequest[] = [];
-
-  let searchFrom = 0;
-  while (true) {
-    const start = text.indexOf(delimiter, searchFrom);
-    if (start === -1) break;
-    const jsonStart = start + delimiter.length;
-    const end = text.indexOf(endDelimiter, jsonStart);
-    if (end === -1) break;
-    const jsonStr = text.slice(jsonStart, end).trim();
-    try {
-      const parsed = JSON.parse(jsonStr);
-      if (parsed.issue && parsed.urgency) {
-        requests.push(parsed as MaintenanceRequest);
-      }
-    } catch {
-      // ignore malformed block
-    }
-    searchFrom = end + endDelimiter.length;
-  }
-
-  return { displayText, maintenanceRequests: requests };
-}
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const anthropic = new Anthropic();
 
     const {
       data: { user },
@@ -59,7 +20,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { message } = await request.json();
+    let message: string;
+    try {
+      const body = await request.json();
+      message = body.message;
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
     if (!message || typeof message !== "string") {
       return NextResponse.json(
         { error: "Message is required" },
