@@ -1,10 +1,44 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 
-export default function LandlordLayout({
+async function checkPaymentStatus() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return redirect("/auth/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("payment_status, trial_ends_at")
+    .eq("id", user.id)
+    .single();
+
+  const status = profile?.payment_status ?? "none";
+
+  // If trial expired, send back to onboarding
+  if (status === "demo_trial" && profile?.trial_ends_at) {
+    const trialEnd = new Date(profile.trial_ends_at);
+    if (trialEnd < new Date()) {
+      return redirect("/protected/onboarding");
+    }
+  }
+
+  // No payment setup and no trial — redirect to onboarding
+  if (status === "none") {
+    return redirect("/protected/onboarding");
+  }
+}
+
+export default async function LandlordLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  await checkPaymentStatus();
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_hsl(151_45%_94%),_hsl(0_0%_100%))]">
       <div className="mx-auto flex w-full max-w-6xl flex-col px-5 pb-12 pt-6 sm:px-8">
