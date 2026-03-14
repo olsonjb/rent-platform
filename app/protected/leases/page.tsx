@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { getLeases } from '@/app/actions/leases';
 import type { LeaseStatus } from '@/lib/types';
-
-export const dynamic = 'force-dynamic';
+import { connection } from 'next/server';
 
 const statusColors: Record<LeaseStatus, string> = {
   active: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
@@ -12,6 +11,7 @@ const statusColors: Record<LeaseStatus, string> = {
 };
 
 export default async function LeasesPage() {
+  await connection();
   const leases = await getLeases();
 
   return (

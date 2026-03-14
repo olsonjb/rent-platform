@@ -2,8 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import type { Lease } from '@/lib/types';
-
-export const dynamic = 'force-dynamic';
+import { connection } from 'next/server';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -14,6 +13,7 @@ function daysUntil(dateStr: string): number {
 }
 
 export default async function PropertyDetailPage({ params }: PageProps) {
+  await connection();
   const { id } = await params;
   const supabase = await createClient();
 

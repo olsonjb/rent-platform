@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { getProperties } from '@/app/actions/properties';
-
-export const dynamic = 'force-dynamic';
+import { connection } from 'next/server';
 
 export default async function PropertiesPage() {
+  await connection();
   const properties = await getProperties();
 
   return (

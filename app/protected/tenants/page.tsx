@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { getTenants } from '@/app/actions/tenants';
-
-export const dynamic = 'force-dynamic';
+import { connection } from 'next/server';
 
 export default async function TenantsPage() {
+  await connection();
   const tenants = await getTenants();
 
   return (

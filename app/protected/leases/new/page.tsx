@@ -2,10 +2,10 @@ import { createLease } from '@/app/actions/leases';
 import { getProperties } from '@/app/actions/properties';
 import { getTenants } from '@/app/actions/tenants';
 import Link from 'next/link';
-
-export const dynamic = 'force-dynamic';
+import { connection } from 'next/server';
 
 export default async function NewLeasePage() {
+  await connection();
   const [properties, tenants] = await Promise.all([getProperties(), getTenants()]);
 
   return (
