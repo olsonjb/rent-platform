@@ -1,0 +1,38 @@
+'use server';
+
+import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import type { LeaseWithRelations } from '@/lib/types';
+
+export async function getLeases(): Promise<LeaseWithRelations[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login');
+
+  const { data, error } = await supabase
+    .from('leases')
+    .select('*, properties(address, city, state), tenants(name, email)')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as LeaseWithRelations[];
+}
+
+export async function createLease(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login');
+
+  const { error } = await supabase.from('leases').insert({
+    landlord_id: user.id,
+    property_id: formData.get('property_id') as string,
+    tenant_id: formData.get('tenant_id') as string,
+    start_date: formData.get('start_date') as string,
+    end_date: formData.get('end_date') as string,
+    monthly_rent: parseFloat(formData.get('monthly_rent') as string),
+    status: formData.get('status') as string,
+  });
+
+  if (error) throw error;
+  redirect('/protected/leases');
+}
