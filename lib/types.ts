@@ -1,4 +1,4 @@
-export type LeaseStatus = 'active' | 'pending' | 'expired' | 'terminated';
+export type LeaseStatus = 'active' | 'pending' | 'expired' | 'terminated' | 'renewed';
 
 export interface Property {
   id: string;
@@ -18,6 +18,7 @@ export interface Property {
   bedrooms?: number | null;
   bathrooms?: number | null;
   monthly_rent?: number | null;
+  sqft?: number | null;
   created_at: string;
 }
 
@@ -41,6 +42,38 @@ export interface Lease {
   end_date: string;
   monthly_rent: number;
   status: LeaseStatus;
+  renewal_offered: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ListingStatus = 'pending' | 'active' | 'rejected' | 'expired' | 'error';
+
+export interface AIDecision {
+  should_list: boolean;
+  reasoning: string;
+  suggested_rent: number | null;
+  urgency: 'high' | 'medium' | 'low';
+}
+
+export interface AIContent {
+  title: string;
+  description: string;
+  highlights: string[];
+}
+
+export interface Listing {
+  id: string;
+  property_id: string;
+  lease_id: string;
+  status: ListingStatus;
+  ai_decision: AIDecision;
+  ai_content: AIContent;
+  suggested_rent: number | null;
+  title: string | null;
+  description: string | null;
+  highlights: string[] | null;
+  provider_results: { provider: string; success: boolean; listingUrl?: string; error?: string }[];
   created_at: string;
   updated_at: string;
 }
