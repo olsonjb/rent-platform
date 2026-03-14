@@ -52,6 +52,15 @@ const redirectToPropertiesWithStatus = (key: 'link_error' | 'link_success', mess
   redirect(`/protected/properties?${params.toString()}`);
 };
 
+const redirectToPropertyDetailWithStatus = (
+  propertyId: string,
+  key: 'link_error' | 'link_success',
+  message: string,
+): never => {
+  const params = new URLSearchParams({ [key]: message });
+  redirect(`/protected/properties/${propertyId}?${params.toString()}`);
+};
+
 const getAuthUserIdByEmail = async (
   email: string,
 ): Promise<{ userId: string | null; lookupError: boolean }> => {
@@ -95,10 +104,10 @@ export async function linkRenterToProperty(formData: FormData) {
     : redirectToPropertiesWithStatus('link_error', 'Property is required.');
   const landlordTenantId = isNonEmptyString(landlordTenantIdValue)
     ? landlordTenantIdValue.trim()
-    : redirectToPropertiesWithStatus('link_error', 'Please select a tenant.');
+    : redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Please select a tenant.');
   const unit = isNonEmptyString(unitValue)
     ? unitValue.trim()
-    : redirectToPropertiesWithStatus('link_error', 'Unit number is required.');
+    : redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Unit number is required.');
 
   const supabase = await createClient();
   const {
@@ -117,7 +126,7 @@ export async function linkRenterToProperty(formData: FormData) {
     .maybeSingle();
 
   if (propertyError || !property) {
-    redirectToPropertiesWithStatus('link_error', 'Property was not found for your account.');
+    redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Property was not found for your account.');
   }
 
   const { data: landlordTenant, error: landlordTenantError } = await supabase
@@ -128,11 +137,12 @@ export async function linkRenterToProperty(formData: FormData) {
     .maybeSingle();
 
   if (landlordTenantError) {
-    redirectToPropertiesWithStatus('link_error', 'Selected tenant was not found.');
+    redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Selected tenant was not found.');
   }
 
   const selectedTenant =
-    landlordTenant ?? redirectToPropertiesWithStatus('link_error', 'Selected tenant was not found.');
+    landlordTenant ??
+    redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Selected tenant was not found.');
 
   let renterId = selectedTenant.auth_user_id;
 
@@ -142,12 +152,17 @@ export async function linkRenterToProperty(formData: FormData) {
     );
 
     if (lookupError) {
-      redirectToPropertiesWithStatus('link_error', 'Unable to validate tenant account right now.');
+      redirectToPropertyDetailWithStatus(
+        propertyId,
+        'link_error',
+        'Unable to validate tenant account right now.',
+      );
     }
 
     const authUserId =
       matchedAuthUserId ??
-      redirectToPropertiesWithStatus(
+      redirectToPropertyDetailWithStatus(
+        propertyId,
         'link_error',
         `No renter account found for ${selectedTenant.email}. Ask them to sign up first.`,
       );
@@ -161,7 +176,11 @@ export async function linkRenterToProperty(formData: FormData) {
       .eq('landlord_id', user.id);
 
     if (linkTenantAuthError) {
-      redirectToPropertiesWithStatus('link_error', 'Unable to save tenant account link right now.');
+      redirectToPropertyDetailWithStatus(
+        propertyId,
+        'link_error',
+        'Unable to save tenant account link right now.',
+      );
     }
   }
 
@@ -174,11 +193,16 @@ export async function linkRenterToProperty(formData: FormData) {
     .maybeSingle();
 
   if (tenantLookupError) {
-    redirectToPropertiesWithStatus('link_error', 'Unable to find renter profile right now.');
+    redirectToPropertyDetailWithStatus(
+      propertyId,
+      'link_error',
+      'Unable to find renter profile right now.',
+    );
   }
 
   if (tenant?.property_id && tenant.property_id !== propertyId) {
-    redirectToPropertiesWithStatus(
+    redirectToPropertyDetailWithStatus(
+      propertyId,
       'link_error',
       'This renter is already linked to another property.',
     );
@@ -191,7 +215,7 @@ export async function linkRenterToProperty(formData: FormData) {
       .eq('id', renterId);
 
     if (updateError) {
-      redirectToPropertiesWithStatus('link_error', 'Unable to link renter right now.');
+      redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Unable to link renter right now.');
     }
   } else {
     const { error: insertError } = await serviceClient.from('tenants').insert({
@@ -203,7 +227,8 @@ export async function linkRenterToProperty(formData: FormData) {
     });
 
     if (insertError) {
-      redirectToPropertiesWithStatus(
+      redirectToPropertyDetailWithStatus(
+        propertyId,
         'link_error',
         'Could not create renter profile from selected tenant.',
       );
@@ -211,6 +236,7 @@ export async function linkRenterToProperty(formData: FormData) {
   }
 
   revalidatePath('/protected/properties');
+  revalidatePath(`/protected/properties/${propertyId}`);
   revalidatePath('/landlord/maintenance-requests');
-  redirectToPropertiesWithStatus('link_success', 'Renter linked successfully.');
+  redirectToPropertyDetailWithStatus(propertyId, 'link_success', 'Renter linked successfully.');
 }
