@@ -90,13 +90,15 @@ export async function POST(request: NextRequest) {
       tenant_id: user.id,
       role: "user",
       content: message,
+      channel: "web",
     });
 
-    // Load conversation history
+    // Load web conversation history only
     const { data: history } = await supabase
       .from("chat_messages")
       .select("role, content")
       .eq("tenant_id", user.id)
+      .eq("channel", "web")
       .order("created_at", { ascending: true })
       .limit(50);
 
@@ -171,6 +173,7 @@ export async function POST(request: NextRequest) {
       tenant_id: user.id,
       role: "assistant",
       content: displayText,
+      channel: "web",
     });
 
     return NextResponse.json({

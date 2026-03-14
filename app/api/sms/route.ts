@@ -87,13 +87,15 @@ export async function POST(request: NextRequest) {
     tenant_id: tenant.id,
     role: "user",
     content: body,
+    channel: "sms",
   });
 
-  // Load conversation history (last 30 messages to stay within SMS context)
+  // Load SMS conversation history only
   const { data: history } = await supabase
     .from("chat_messages")
     .select("role, content")
     .eq("tenant_id", tenant.id)
+    .eq("channel", "sms")
     .order("created_at", { ascending: true })
     .limit(30);
 
@@ -161,6 +163,7 @@ export async function POST(request: NextRequest) {
     tenant_id: tenant.id,
     role: "assistant",
     content: displayText,
+    channel: "sms",
   });
 
   return twimlReply(displayText);
