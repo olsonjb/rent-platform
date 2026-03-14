@@ -3,17 +3,19 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { getStripe, getStripeMode } from '@/lib/stripe';
 
 /**
  * Ensure a Stripe customer exists for the current user. Returns the customer ID.
  */
 async function ensureStripeCustomer(
-  supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   email?: string,
 ) {
-  const { data: profile } = await supabase
+  const svc = createServiceClient();
+
+  const { data: profile } = await svc
     .from('profiles')
     .select('stripe_customer_id')
     .eq('id', userId)
@@ -27,7 +29,7 @@ async function ensureStripeCustomer(
       metadata: { supabase_user_id: userId },
     });
 
-    const { data: updated } = await supabase
+    const { data: updated } = await svc
       .from('profiles')
       .update({ stripe_customer_id: customer.id })
       .eq('id', userId)
@@ -45,10 +47,10 @@ async function ensureStripeCustomer(
  * Get total monthly rent (in cents) across all active leases for a landlord.
  */
 async function getTotalMonthlyRent(
-  supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<number> {
-  const { data: leases } = await supabase
+  const svc = createServiceClient();
+  const { data: leases } = await svc
     .from('leases')
     .select('monthly_rent')
     .eq('landlord_id', userId)
@@ -74,14 +76,16 @@ export async function createSetupCheckoutSession() {
     redirect('/auth/login');
   }
 
-  await supabase
+  const svc = createServiceClient();
+
+  await svc
     .from('profiles')
     .upsert({ id: user.id, email: user.email }, { onConflict: 'id' });
 
-  const stripeCustomerId = await ensureStripeCustomer(supabase, user.id, user.email);
-  const totalRentCents = await getTotalMonthlyRent(supabase, user.id);
+  const stripeCustomerId = await ensureStripeCustomer(user.id, user.email);
+  const totalRentCents = await getTotalMonthlyRent(user.id);
 
-  await supabase
+  await svc
     .from('profiles')
     .update({ total_monthly_rent: totalRentCents })
     .eq('id', user.id);
@@ -124,15 +128,16 @@ export async function activateDemoTrial() {
   const trialEnd = new Date();
   trialEnd.setDate(trialEnd.getDate() + 30);
 
-  // Ensure the profile row exists before updating — upsert with only the
-  // identity columns so we never conflict on stripe_customer_id uniqueness.
-  await supabase
+  const svc = createServiceClient();
+
+  // Ensure profile row exists, then set trial fields.
+  // Uses service role client — the anon/authenticated role can't see
+  // 'profiles' in PostgREST's schema cache (missing GRANTs).
+  await svc
     .from('profiles')
     .upsert({ id: user.id, email: user.email }, { onConflict: 'id' });
 
-  // Use a targeted update (not upsert) so RLS UPDATE policy applies cleanly
-  // and we don't risk silent failures from INSERT-path constraint checks.
-  const { error } = await supabase
+  const { error } = await svc
     .from('profiles')
     .update({
       payment_status: 'demo_trial',
@@ -159,13 +164,15 @@ export async function getOnboardingStatus() {
 
   if (!user) return null;
 
-  const { data: profile } = await supabase
+  const svc = createServiceClient();
+
+  const { data: profile } = await svc
     .from('profiles')
     .select('payment_status, trial_ends_at, total_monthly_rent')
     .eq('id', user.id)
     .single();
 
-  const totalRentCents = await getTotalMonthlyRent(supabase, user.id);
+  const totalRentCents = await getTotalMonthlyRent(user.id);
   const feeCents = Math.round(totalRentCents * 0.03);
 
   return {
