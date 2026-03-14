@@ -22,6 +22,28 @@ export const MAINTENANCE_REQUEST_STATUSES = ["pending", "in_progress", "complete
 
 export type MaintenanceRequestStatus = (typeof MAINTENANCE_REQUEST_STATUSES)[number];
 
+export const MAINTENANCE_REQUEST_LOCATION_LABELS: Record<MaintenanceRequestLocation, string> = {
+  kitchen: "Kitchen",
+  bathroom: "Bathroom",
+  "living-room": "Living room",
+  bedroom: "Bedroom",
+  hvac: "Heating / cooling",
+  other: "Other",
+};
+
+export const MAINTENANCE_REQUEST_URGENCY_LABELS: Record<MaintenanceRequestUrgency, string> = {
+  habitability: "Habitability",
+  standard: "Standard",
+};
+
+export const MAINTENANCE_REQUEST_ENTRY_PERMISSION_LABELS: Record<
+  MaintenanceRequestEntryPermission,
+  string
+> = {
+  "can-enter": "Can enter with notice",
+  "present-only": "Only when I am present",
+};
+
 export const MAINTENANCE_REQUEST_STATUS_LABELS: Record<MaintenanceRequestStatus, string> = {
   pending: "Pending",
   in_progress: "In progress",

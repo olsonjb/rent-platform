@@ -79,6 +79,7 @@ export function SignUpForm({
         options: {
           emailRedirectTo: `${window.location.origin}/protected`,
           data: {
+            // TODO: move role assignment to app_metadata via a server-side hook; user_metadata is user-controlled.
             userType: primaryRole,
             role: primaryRole,
             roles: selectedRoles,

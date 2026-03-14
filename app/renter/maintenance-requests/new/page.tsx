@@ -1,33 +1,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import {
+  MAINTENANCE_REQUEST_ENTRY_PERMISSION_LABELS,
   MAINTENANCE_REQUEST_ENTRY_PERMISSIONS,
+  MAINTENANCE_REQUEST_LOCATION_LABELS,
   MAINTENANCE_REQUEST_LOCATIONS,
+  MAINTENANCE_REQUEST_URGENCY_LABELS,
   MAINTENANCE_REQUEST_URGENCIES,
 } from "@/lib/maintenance-requests";
 import { createMaintenanceRequest } from "../actions";
-
-const LOCATION_LABELS: Record<(typeof MAINTENANCE_REQUEST_LOCATIONS)[number], string> = {
-  kitchen: "Kitchen",
-  bathroom: "Bathroom",
-  "living-room": "Living room",
-  bedroom: "Bedroom",
-  hvac: "Heating / cooling",
-  other: "Other",
-};
-
-const URGENCY_LABELS: Record<(typeof MAINTENANCE_REQUEST_URGENCIES)[number], string> = {
-  habitability: "Habitability (health/safety concern)",
-  standard: "Standard (non-emergency)",
-};
-
-const ENTRY_PERMISSION_LABELS: Record<
-  (typeof MAINTENANCE_REQUEST_ENTRY_PERMISSIONS)[number],
-  string
-> = {
-  "can-enter": "Can enter with notice",
-  "present-only": "Only when I am present",
-};
 
 type NewMaintenanceRequestPageProps = {
   searchParams: Promise<{
@@ -123,7 +104,7 @@ async function NewMaintenanceRequestContent({
               </option>
               {MAINTENANCE_REQUEST_LOCATIONS.map((location) => (
                 <option key={location} value={location}>
-                  {LOCATION_LABELS[location]}
+                  {MAINTENANCE_REQUEST_LOCATION_LABELS[location]}
                 </option>
               ))}
             </select>
@@ -135,7 +116,7 @@ async function NewMaintenanceRequestContent({
               {MAINTENANCE_REQUEST_URGENCIES.map((urgency) => (
                 <label key={urgency} className="flex items-center gap-2">
                   <input type="radio" name="urgency" value={urgency} required />
-                  {URGENCY_LABELS[urgency]}
+                  {MAINTENANCE_REQUEST_URGENCY_LABELS[urgency]}
                 </label>
               ))}
             </div>
@@ -173,7 +154,7 @@ async function NewMaintenanceRequestContent({
               </option>
               {MAINTENANCE_REQUEST_ENTRY_PERMISSIONS.map((entryPermission) => (
                 <option key={entryPermission} value={entryPermission}>
-                  {ENTRY_PERMISSION_LABELS[entryPermission]}
+                  {MAINTENANCE_REQUEST_ENTRY_PERMISSION_LABELS[entryPermission]}
                 </option>
               ))}
             </select>

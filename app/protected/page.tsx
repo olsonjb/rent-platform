@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { USER_TYPE_LABELS, getUserRolesFromClaims } from "@/lib/auth/user-types";
 
 async function ProtectedResolver() {
+  // Opt into dynamic rendering so auth state is always fresh.
   await connection();
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();

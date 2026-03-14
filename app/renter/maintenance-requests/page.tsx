@@ -2,10 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import {
+  MAINTENANCE_REQUEST_LOCATION_LABELS,
   MAINTENANCE_REQUEST_STATUSES,
   MAINTENANCE_REQUEST_STATUS_LABELS,
+  MAINTENANCE_REQUEST_URGENCY_LABELS,
+  isMaintenanceRequestLocation,
+  isMaintenanceRequestStatus,
+  isMaintenanceRequestUrgency,
   type MaintenanceRequestStatus,
 } from "@/lib/maintenance-requests";
+import { getUserRolesFromClaims } from "@/lib/auth/user-types";
 import { createClient } from "@/lib/supabase/server";
 
 type MaintenanceRequestHistoryRow = {
@@ -14,7 +20,7 @@ type MaintenanceRequestHistoryRow = {
   unit: string;
   location: string | null;
   urgency: string;
-  status: string;
+  status: MaintenanceRequestStatus;
   created_at: string;
 };
 
@@ -22,20 +28,6 @@ const STATUS_BADGE_STYLES: Record<MaintenanceRequestStatus, string> = {
   pending: "bg-sky-100 text-sky-900",
   in_progress: "bg-amber-100 text-amber-900",
   completed: "bg-emerald-100 text-emerald-900",
-};
-
-const LOCATION_LABELS: Record<string, string> = {
-  kitchen: "Kitchen",
-  bathroom: "Bathroom",
-  "living-room": "Living room",
-  bedroom: "Bedroom",
-  hvac: "Heating / cooling",
-  other: "Other",
-};
-
-const URGENCY_LABELS: Record<string, string> = {
-  habitability: "Habitability",
-  standard: "Standard",
 };
 
 const formatDate = (value: string) => {
@@ -50,27 +42,28 @@ const formatDate = (value: string) => {
   }).format(date);
 };
 
-const getKnownStatus = (status: string): MaintenanceRequestStatus => {
-  if (status === "in_progress") {
-    return "in_progress";
-  }
-
-  if (status === "completed") {
-    return "completed";
-  }
-
-  return "pending";
+type MaintenanceRequestHistoryPageProps = {
+  searchParams: Promise<{
+    success?: string;
+  }>;
 };
 
-export default async function MaintenanceRequestHistoryPage() {
+export default async function MaintenanceRequestHistoryPage({
+  searchParams,
+}: MaintenanceRequestHistoryPageProps) {
   return (
     <Suspense fallback={<MaintenanceRequestHistoryFallback />}>
-      <MaintenanceRequestHistoryContent />
+      <MaintenanceRequestHistoryContent searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function MaintenanceRequestHistoryContent() {
+async function MaintenanceRequestHistoryContent({
+  searchParams,
+}: MaintenanceRequestHistoryPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const hasSuccessState = resolvedSearchParams.success === "1";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -78,6 +71,18 @@ async function MaintenanceRequestHistoryContent() {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
+    redirect("/auth/login");
+  }
+
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+
+  if (claimsError || !claimsData?.claims) {
+    redirect("/auth/login");
+  }
+
+  const roles = getUserRolesFromClaims(claimsData.claims);
+
+  if (!roles.includes("renter")) {
     redirect("/auth/login");
   }
 
@@ -98,8 +103,12 @@ async function MaintenanceRequestHistoryContent() {
   };
 
   for (const request of requests) {
-    const knownStatus = getKnownStatus(request.status);
-    requestsByStatus[knownStatus].push(request);
+    if (!isMaintenanceRequestStatus(request.status)) {
+      console.warn("Unknown maintenance request status", { requestId: request.id, status: request.status });
+      continue;
+    }
+
+    requestsByStatus[request.status].push({ ...request, status: request.status });
   }
 
   return (
@@ -127,6 +136,12 @@ async function MaintenanceRequestHistoryContent() {
         </p>
       ) : null}
 
+      {hasSuccessState ? (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          Request submitted. Your property team will review and follow up shortly.
+        </p>
+      ) : null}
+
       {requests.length === 0 && !error ? (
         <div className="rounded-2xl border border-zinc-900/10 bg-white p-6 shadow-sm">
           <p className="text-sm text-zinc-600">No maintenance requests yet.</p>
@@ -150,34 +165,44 @@ async function MaintenanceRequestHistoryContent() {
           <section key={status} className="space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900">{MAINTENANCE_REQUEST_STATUS_LABELS[status]}</h2>
             <div className="space-y-3">
-              {items.map((request) => (
-                <article
-                  key={request.id}
-                  className="rounded-2xl border border-zinc-900/10 bg-white p-5 shadow-sm"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <h3 className="text-base font-semibold tracking-tight text-zinc-950">
-                        {request.issue}
-                      </h3>
-                      <p className="text-sm text-zinc-600">
-                        Unit {request.unit} - {URGENCY_LABELS[request.urgency] ?? request.urgency}
-                      </p>
-                      {request.location ? (
-                        <p className="text-sm text-zinc-500">
-                          Location: {LOCATION_LABELS[request.location] ?? request.location}
+              {items.map((request) => {
+                const urgencyLabel = isMaintenanceRequestUrgency(request.urgency)
+                  ? MAINTENANCE_REQUEST_URGENCY_LABELS[request.urgency]
+                  : request.urgency;
+                const locationLabel =
+                  request.location && isMaintenanceRequestLocation(request.location)
+                    ? MAINTENANCE_REQUEST_LOCATION_LABELS[request.location]
+                    : request.location;
+
+                return (
+                  <article
+                    key={request.id}
+                    className="rounded-2xl border border-zinc-900/10 bg-white p-5 shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <h3 className="text-base font-semibold tracking-tight text-zinc-950">
+                          {request.issue}
+                        </h3>
+                        <p className="text-sm text-zinc-600">
+                          Unit {request.unit} - {urgencyLabel}
                         </p>
-                      ) : null}
+                        {locationLabel ? (
+                          <p className="text-sm text-zinc-500">
+                            Location: {locationLabel}
+                          </p>
+                        ) : null}
+                      </div>
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${STATUS_BADGE_STYLES[request.status]}`}
+                      >
+                        {MAINTENANCE_REQUEST_STATUS_LABELS[request.status]}
+                      </span>
                     </div>
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${STATUS_BADGE_STYLES[getKnownStatus(request.status)]}`}
-                    >
-                      {MAINTENANCE_REQUEST_STATUS_LABELS[getKnownStatus(request.status)]}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-xs text-zinc-500">Submitted {formatDate(request.created_at)}</p>
-                </article>
-              ))}
+                    <p className="mt-3 text-xs text-zinc-500">Submitted {formatDate(request.created_at)}</p>
+                  </article>
+                );
+              })}
             </div>
           </section>
         );

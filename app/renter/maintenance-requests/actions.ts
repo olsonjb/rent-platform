@@ -7,6 +7,7 @@ import {
   isMaintenanceRequestLocation,
   isMaintenanceRequestUrgency,
 } from "@/lib/maintenance-requests";
+import { getUserRolesFromClaims } from "@/lib/auth/user-types";
 import { createClient } from "@/lib/supabase/server";
 
 const isNonEmptyString = (value: FormDataEntryValue | null): value is string => {
@@ -65,6 +66,18 @@ export async function createMaintenanceRequest(formData: FormData) {
     redirect("/auth/login");
   }
 
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+
+  if (claimsError || !claimsData?.claims) {
+    redirect("/auth/login");
+  }
+
+  const roles = getUserRolesFromClaims(claimsData.claims);
+
+  if (!roles.includes("renter")) {
+    redirect("/auth/login");
+  }
+
   const { error } = await supabase.from("maintenance_requests").insert({
     tenant_id: user.id,
     issue: issueTitle,
@@ -81,5 +94,5 @@ export async function createMaintenanceRequest(formData: FormData) {
   }
 
   revalidatePath("/renter/maintenance-requests");
-  redirect("/renter/maintenance-requests/new?success=1");
+  redirect("/renter/maintenance-requests?success=1");
 }
