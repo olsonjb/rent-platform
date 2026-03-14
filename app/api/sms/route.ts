@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
-import { sendSms, toE164, buildLandlordSms } from "@/lib/twilio/sms";
+import { sendSms, toE164, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createServiceClient();
-  const normalizedPhone = toE164(from);
+  const normalizedPhone = normalizeFromForLookup(from);
 
   // Look up tenant by phone number
   const { data: tenant, error: tenantError } = await supabase
