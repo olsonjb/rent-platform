@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   MAINTENANCE_REQUEST_ENTRY_PERMISSIONS,
   MAINTENANCE_REQUEST_LOCATIONS,
@@ -37,6 +38,16 @@ type NewMaintenanceRequestPageProps = {
 };
 
 export default async function NewMaintenanceRequestPage({
+  searchParams,
+}: NewMaintenanceRequestPageProps) {
+  return (
+    <Suspense>
+      <NewMaintenanceRequestContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function NewMaintenanceRequestContent({
   searchParams,
 }: NewMaintenanceRequestPageProps) {
   const resolvedSearchParams = await searchParams;
