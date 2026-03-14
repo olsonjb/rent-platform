@@ -1,51 +1,11 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
+import { parseMaintenanceRequests } from "@/lib/chat/parse-maintenance";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
-
-const anthropic = new Anthropic();
-
-interface MaintenanceRequest {
-  issue: string;
-  urgency: "habitability" | "standard";
-}
-
-function parseMaintenanceRequests(
-  text: string
-): { displayText: string; maintenanceRequests: MaintenanceRequest[] } {
-  const delimiter = "|||MAINTENANCE_REQUEST|||";
-  const endDelimiter = "|||END|||";
-
-  const firstIdx = text.indexOf(delimiter);
-  if (firstIdx === -1) return { displayText: text.trim(), maintenanceRequests: [] };
-
-  const displayText = text.slice(0, firstIdx).trim();
-  const requests: MaintenanceRequest[] = [];
-
-  let searchFrom = 0;
-  while (true) {
-    const start = text.indexOf(delimiter, searchFrom);
-    if (start === -1) break;
-    const jsonStart = start + delimiter.length;
-    const end = text.indexOf(endDelimiter, jsonStart);
-    if (end === -1) break;
-    const jsonStr = text.slice(jsonStart, end).trim();
-    try {
-      const parsed = JSON.parse(jsonStr);
-      if (parsed.issue && parsed.urgency) {
-        requests.push(parsed as MaintenanceRequest);
-      }
-    } catch {
-      // ignore malformed block
-    }
-    searchFrom = end + endDelimiter.length;
-  }
-
-  return { displayText, maintenanceRequests: requests };
-}
 
 function twimlReply(message: string): NextResponse {
   const MessagingResponse = twilio.twiml.MessagingResponse;
@@ -57,7 +17,29 @@ function twimlReply(message: string): NextResponse {
 }
 
 export async function POST(request: NextRequest) {
+  const anthropic = new Anthropic();
   const formData = await request.formData();
+
+  // Validate Twilio request signature
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!authToken) {
+    console.error("Missing TWILIO_AUTH_TOKEN");
+    return new NextResponse("Server configuration error", { status: 500 });
+  }
+
+  const signature = request.headers.get("X-Twilio-Signature") ?? "";
+  const url = request.url;
+
+  // Convert FormData to plain object for validation
+  const params: Record<string, string> = {};
+  formData.forEach((value, key) => {
+    params[key] = value.toString();
+  });
+
+  if (!twilio.validateRequest(authToken, signature, url, params)) {
+    return new NextResponse("Invalid signature", { status: 403 });
+  }
+
   const from = formData.get("From") as string;
   const body = formData.get("Body") as string;
 
