@@ -83,9 +83,13 @@ export default function ChatPage() {
       };
       setMessages((prev) => [...prev, assistantMsg]);
 
-      if (data.maintenanceRequest) {
+      if (data.maintenanceRequests?.length > 0) {
+        const count = data.maintenanceRequests.length;
+        const hasUrgent = data.maintenanceRequests.some((r: { urgency: string }) => r.urgency === "habitability");
         setBanner(
-          `Maintenance request submitted! (${data.maintenanceRequest.urgency === "habitability" ? "Urgent - 3 day response" : "Standard - 10 day response"})`
+          count === 1
+            ? `Maintenance request submitted! (${hasUrgent ? "Urgent - 3 day response" : "Standard - 10 day response"})`
+            : `${count} maintenance requests submitted!`
         );
       }
     } catch (err) {
