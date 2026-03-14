@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChatMessage } from "@/components/chat-message";
 import { createClient } from "@/lib/supabase/client";
-import { Send } from "lucide-react";
+import { Send, SquarePen } from "lucide-react";
 
 interface Message {
   id: string;
@@ -50,6 +50,15 @@ export default function ChatPage() {
     const timer = setTimeout(() => setBanner(null), 4000);
     return () => clearTimeout(timer);
   }, [banner]);
+
+  async function newConversation() {
+    const supabase = createClient();
+    await supabase
+      .from("chat_messages")
+      .delete()
+      .eq("channel", "web");
+    setMessages([]);
+  }
 
   async function sendMessage() {
     const text = input.trim();
@@ -110,6 +119,21 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)] w-full max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b mb-3">
+        <span className="text-sm font-medium text-zinc-700">Property Assistant</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={newConversation}
+          disabled={loading || messages.length === 0}
+          className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <SquarePen className="h-3.5 w-3.5" />
+          New conversation
+        </Button>
+      </div>
+
       {/* Banner */}
       {banner && (
         <div className="bg-emerald-100 text-emerald-900 text-sm font-medium px-4 py-2.5 rounded-md mb-3 animate-in fade-in">
