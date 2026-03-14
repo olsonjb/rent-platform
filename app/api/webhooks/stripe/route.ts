@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, stripeMode } from '@/lib/stripe';
+import { getStripe, getStripeMode } from '@/lib/stripe';
 import { createServiceClient } from '@/lib/supabase/service';
 
 const WEBHOOK_SECRETS = {
@@ -8,16 +8,19 @@ const WEBHOOK_SECRETS = {
 } as const;
 
 export async function POST(req: NextRequest) {
+  const stripe = getStripe();
+  const mode = getStripeMode();
+
   const sig = req.headers.get('stripe-signature');
 
   if (!sig) {
     return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 
-  const webhookSecret = WEBHOOK_SECRETS[stripeMode];
+  const webhookSecret = WEBHOOK_SECRETS[mode];
   if (!webhookSecret) {
     const varName =
-      stripeMode === 'demo' ? 'STRIPE_TEST_WEBHOOK_SECRET' : 'STRIPE_LIVE_WEBHOOK_SECRET';
+      mode === 'demo' ? 'STRIPE_TEST_WEBHOOK_SECRET' : 'STRIPE_LIVE_WEBHOOK_SECRET';
     console.error(`${varName} is not configured`);
     return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
   }

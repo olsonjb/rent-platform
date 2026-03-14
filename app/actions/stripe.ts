@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { stripe, stripeMode } from '@/lib/stripe';
+import { getStripe, getStripeMode } from '@/lib/stripe';
 
 /**
  * Ensure a Stripe customer exists for the current user. Returns the customer ID.
@@ -21,7 +21,7 @@ async function ensureStripeCustomer(
   let stripeCustomerId = profile?.stripe_customer_id ?? null;
 
   if (!stripeCustomerId) {
-    const customer = await stripe.customers.create({
+    const customer = await getStripe().customers.create({
       email,
       metadata: { supabase_user_id: userId },
     });
@@ -87,7 +87,7 @@ export async function createSetupCheckoutSession() {
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     mode: 'setup',
     customer: stripeCustomerId,
     client_reference_id: user.id,
