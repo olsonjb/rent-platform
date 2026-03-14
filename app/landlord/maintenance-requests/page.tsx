@@ -35,7 +35,7 @@ type MaintenanceRequestRow = {
     name: string;
     property_id: string | null;
   }> | null;
-  maintenance_request_reviews: MaintenanceReview[] | null;
+  maintenance_request_reviews: MaintenanceReview[] | MaintenanceReview | null;
 };
 
 type PropertyRow = {
@@ -178,7 +178,9 @@ async function LandlordMaintenanceRequestsContent() {
                 ? propertyMap.get(tenant.property_id)
                 : null;
 
-            const [review] = request.maintenance_request_reviews ?? [];
+            const review = Array.isArray(request.maintenance_request_reviews)
+              ? request.maintenance_request_reviews[0]
+              : request.maintenance_request_reviews;
 
             return (
               <article key={request.id} className="rounded-2xl border border-zinc-900/10 bg-white p-5 shadow-sm">
