@@ -9,10 +9,6 @@ export default function LandlordDashboardPage() {
       <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
         Landlord dashboard
       </h1>
-      <p className="text-sm leading-relaxed text-zinc-600 sm:text-base">
-        You can now lock landlord-only pages under <code>/landlord/*</code>. Renter accounts are
-        automatically redirected to their own dashboard.
-      </p>
       <div className="rounded-2xl border border-zinc-900/10 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold tracking-tight text-zinc-900">Maintenance operations</h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-600">

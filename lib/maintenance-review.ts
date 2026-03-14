@@ -198,7 +198,7 @@ async function fetchMaintenanceRequestContext(
   };
 }
 
-async function estimateCostWithAnthropic(context: MaintenanceRequestContext): Promise<CostEstimate> {
+async function estimateCost(context: MaintenanceRequestContext): Promise<CostEstimate> {
   const anthropic = new Anthropic({ apiKey: getRequiredEnv("ANTHROPIC_API_KEY") });
 
   const response = await anthropic.messages.create({
@@ -429,7 +429,7 @@ export async function processQueuedMaintenanceReviews(batchSize?: number) {
   for (const job of claimedJobs) {
     try {
       const requestContext = await fetchMaintenanceRequestContext(job.maintenance_request_id);
-      const estimate = await estimateCostWithAnthropic(requestContext);
+      const estimate = await estimateCost(requestContext);
       const vendors = await findNearbyVendors(requestContext, estimate.trade);
 
       await saveReview(job.maintenance_request_id, estimate, vendors);
