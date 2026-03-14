@@ -22,6 +22,15 @@ export default function ProtectedLayout({
               >
                 Chat
               </Link>
+              <Link href="/protected/properties" className="text-muted-foreground hover:text-foreground transition-colors font-normal">
+                Properties
+              </Link>
+              <Link href="/protected/tenants" className="text-muted-foreground hover:text-foreground transition-colors font-normal">
+                Tenants
+              </Link>
+              <Link href="/protected/leases" className="text-muted-foreground hover:text-foreground transition-colors font-normal">
+                Leases
+              </Link>
             </div>
             {hasEnvVars && (
               <Suspense>
