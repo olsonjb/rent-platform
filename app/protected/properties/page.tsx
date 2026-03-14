@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { getProperties } from '@/app/actions/properties';
 
+export const dynamic = 'force-dynamic';
+
 export default async function PropertiesPage() {
   const properties = await getProperties();
 

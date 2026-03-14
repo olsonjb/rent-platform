@@ -3,6 +3,8 @@ import { getProperties } from '@/app/actions/properties';
 import { getTenants } from '@/app/actions/tenants';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 export default async function NewLeasePage() {
   const [properties, tenants] = await Promise.all([getProperties(), getTenants()]);
 

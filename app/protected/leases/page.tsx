@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { getLeases } from '@/app/actions/leases';
 import type { LeaseStatus } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 const statusColors: Record<LeaseStatus, string> = {
   active: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
