@@ -5,8 +5,8 @@
       "schedule": "0 8 * * *"
     },
     {
-      "path": "/api/internal/maintenance-reviews/process",
-      "schedule": "*/5 * * * *"
+      "path": "/api/internal/maintenance-reviews/process?batch=200",
+      "schedule": "5 8 * * *"
     }
   ]
 }

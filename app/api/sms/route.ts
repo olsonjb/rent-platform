@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
+import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, toE164, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
@@ -125,13 +126,17 @@ export async function POST(request: NextRequest) {
 
   // If maintenance request detected, insert it and notify landlord
   if (maintenanceRequest) {
-    await supabase.from("maintenance_requests").insert({
+    const { error: maintenanceInsertError } = await supabase.from("maintenance_requests").insert({
       tenant_id: tenant.id,
       unit: tenant.unit,
       issue: maintenanceRequest.issue,
       urgency: maintenanceRequest.urgency,
       status: "pending",
     });
+
+    if (!maintenanceInsertError) {
+      triggerMaintenanceReviewProcessingInBackground();
+    }
 
     if (property.manager_phone) {
       const landlordMsg = buildLandlordSms({
