@@ -15,9 +15,10 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { getHomeRouteForUserType } from "@/lib/auth/authorization";
 import {
   USER_TYPE_LABELS,
-  getUserTypeFromMetadata,
+  getUserRolesFromClaims,
   type UserType,
 } from "@/lib/auth/user-types";
 
@@ -45,19 +46,21 @@ export function LoginForm({
       });
       if (error) throw error;
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const accountType = getUserTypeFromMetadata(user?.user_metadata);
+      const { data, error: claimsError } = await supabase.auth.getClaims();
 
-      if (accountType !== userType) {
+      if (claimsError || !data?.claims) {
+        throw claimsError ?? new Error("Unable to verify account permissions");
+      }
+
+      const accountRoles = getUserRolesFromClaims(data.claims);
+
+      if (!accountRoles.includes(userType)) {
         await supabase.auth.signOut();
-        setError(`This account is not registered as a ${USER_TYPE_LABELS[userType]}.`);
+        setError(`This account is not registered for ${USER_TYPE_LABELS[userType]} access.`);
         return;
       }
 
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/protected");
+      router.push(getHomeRouteForUserType(userType));
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -67,7 +70,7 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="rounded-2xl border-zinc-900/10 bg-white shadow-[0_24px_64px_-36px_rgba(0,0,0,0.4)]">
+      <Card className="rounded-2xl border-zinc-900/10 bg-white text-zinc-900 shadow-[0_24px_64px_-36px_rgba(0,0,0,0.4)]">
         <CardHeader>
           <CardTitle className="text-2xl tracking-tight text-zinc-950">Sign in</CardTitle>
           <CardDescription>
@@ -78,12 +81,14 @@ export function LoginForm({
           <form onSubmit={handleLogin}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-zinc-900">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@company.com"
-                  className="border-zinc-900/15"
+                  className="border-zinc-900/15 bg-white text-zinc-900 placeholder:text-zinc-500"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -96,7 +101,9 @@ export function LoginForm({
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password" className="text-zinc-900">
+                    Password
+                  </Label>
                   <Link
                     href="/auth/forgot-password"
                     className="ml-auto inline-block text-sm text-zinc-600 underline-offset-4 hover:text-zinc-950 hover:underline"
@@ -107,7 +114,7 @@ export function LoginForm({
                 <Input
                   id="password"
                   type="password"
-                  className="border-zinc-900/15"
+                  className="border-zinc-900/15 bg-white text-zinc-900 placeholder:text-zinc-500"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

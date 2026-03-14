@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -24,10 +25,32 @@ export function SignUpForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
-  const [userType, setUserType] = useState<UserType>("landlord");
+  const [selectedRoles, setSelectedRoles] = useState<UserType[]>(["landlord"]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  const toggleRole = (role: UserType, isChecked: boolean) => {
+    setSelectedRoles((currentRoles) => {
+      if (isChecked) {
+        if (currentRoles.includes(role)) {
+          return currentRoles;
+        }
+
+        return [...currentRoles, role];
+      }
+
+      if (!currentRoles.includes(role)) {
+        return currentRoles;
+      }
+
+      if (currentRoles.length === 1) {
+        return currentRoles;
+      }
+
+      return currentRoles.filter((existingRole) => existingRole !== role);
+    });
+  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +64,14 @@ export function SignUpForm({
       return;
     }
 
+    if (selectedRoles.length === 0) {
+      setError("Select at least one account type");
+      setIsLoading(false);
+      return;
+    }
+
+    const primaryRole = selectedRoles[0] ?? "landlord";
+
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -48,7 +79,9 @@ export function SignUpForm({
         options: {
           emailRedirectTo: `${window.location.origin}/protected`,
           data: {
-            userType,
+            userType: primaryRole,
+            role: primaryRole,
+            roles: selectedRoles,
           },
         },
       });
@@ -63,7 +96,7 @@ export function SignUpForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="rounded-2xl border-zinc-900/10 bg-white shadow-[0_24px_64px_-36px_rgba(0,0,0,0.4)]">
+      <Card className="rounded-2xl border-zinc-900/10 bg-white text-zinc-900 shadow-[0_24px_64px_-36px_rgba(0,0,0,0.4)]">
         <CardHeader>
           <CardTitle className="text-2xl tracking-tight text-zinc-950">Sign up</CardTitle>
           <CardDescription>Create your Auto PM account.</CardDescription>
@@ -72,62 +105,67 @@ export function SignUpForm({
           <form onSubmit={handleSignUp}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-zinc-900">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@company.com"
-                  className="border-zinc-900/15"
+                  className="border-zinc-900/15 bg-white text-zinc-900 placeholder:text-zinc-500"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="user-type">I am a</Label>
-                <select
-                  id="user-type"
-                  className="h-10 rounded-md border border-zinc-900/15 bg-transparent px-3 py-2 text-sm shadow-sm"
-                  value={userType}
-                  onChange={(e) => {
-                    const selectedType = e.target.value;
-                    if (USER_TYPES.includes(selectedType as UserType)) {
-                      setUserType(selectedType as UserType);
-                    }
-                  }}
-                >
+              <div className="grid gap-3">
+                <Label className="text-zinc-900">I need access as</Label>
+                <div className="grid gap-2 rounded-md border border-zinc-900/15 bg-zinc-50/50 p-3">
                   {USER_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {USER_TYPE_LABELS[type]}
-                    </option>
+                    <label key={type} className="flex items-center gap-3 text-sm text-zinc-800">
+                      <Checkbox
+                        checked={selectedRoles.includes(type)}
+                        onCheckedChange={(checked) => {
+                          toggleRole(type, checked === true);
+                        }}
+                      />
+                      <span>{USER_TYPE_LABELS[type]}</span>
+                    </label>
                   ))}
-                </select>
+                  <p className="text-xs text-zinc-500">
+                    Choose one or both roles. You can sign in through either role login page.
+                  </p>
+                </div>
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  className="border-zinc-900/15"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+                   <Label htmlFor="password" className="text-zinc-900">
+                     Password
+                   </Label>
+                 </div>
+                 <Input
+                   id="password"
+                   type="password"
+                   className="border-zinc-900/15 bg-white text-zinc-900 placeholder:text-zinc-500"
+                   required
+                   value={password}
+                   onChange={(e) => setPassword(e.target.value)}
+                 />
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
-                  <Label htmlFor="repeat-password">Repeat Password</Label>
-                </div>
-                <Input
-                  id="repeat-password"
-                  type="password"
-                  className="border-zinc-900/15"
-                  required
-                  value={repeatPassword}
-                  onChange={(e) => setRepeatPassword(e.target.value)}
-                />
+                   <Label htmlFor="repeat-password" className="text-zinc-900">
+                     Repeat Password
+                   </Label>
+                 </div>
+                 <Input
+                   id="repeat-password"
+                   type="password"
+                   className="border-zinc-900/15 bg-white text-zinc-900 placeholder:text-zinc-500"
+                   required
+                   value={repeatPassword}
+                   onChange={(e) => setRepeatPassword(e.target.value)}
+                 />
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
               <Button

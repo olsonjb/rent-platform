@@ -1,29 +1,13 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-
-import { createClient } from "@/lib/supabase/server";
-import { InfoIcon } from "lucide-react";
-import { FetchDataSteps } from "@/components/tutorial/fetch-data-steps";
+import { connection } from "next/server";
 import { Suspense } from "react";
-import { USER_TYPE_LABELS, USER_TYPES, type UserType } from "@/lib/auth/user-types";
+import { getHomeRouteForUserRoles, getHomeRouteForUserType } from "@/lib/auth/authorization";
+import { createClient } from "@/lib/supabase/server";
+import { USER_TYPE_LABELS, getUserRolesFromClaims } from "@/lib/auth/user-types";
 
-const getUserTypeFromClaims = (claims: Record<string, unknown>): UserType | null => {
-  const metadata = claims.user_metadata;
-
-  if (!metadata || typeof metadata !== "object") {
-    return null;
-  }
-
-  const metadataWithUserType = metadata as { userType?: unknown; role?: unknown };
-  const value = metadataWithUserType.userType ?? metadataWithUserType.role;
-
-  if (typeof value === "string" && USER_TYPES.includes(value as UserType)) {
-    return value as UserType;
-  }
-
-  return null;
-};
-
-async function UserDetails() {
+async function ProtectedResolver() {
+  await connection();
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
 
@@ -31,51 +15,55 @@ async function UserDetails() {
     redirect("/auth/login");
   }
 
-  return JSON.stringify(data.claims, null, 2);
-}
+  const roles = getUserRolesFromClaims(data.claims);
 
-async function UserTypeBadge() {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
-
-  if (error || !data?.claims) {
-    redirect("/auth/login");
+  if (roles.length === 0) {
+    return (
+      <div className="max-w-xl space-y-4">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">Account type missing</h1>
+        <p className="text-sm leading-relaxed text-zinc-600 sm:text-base">
+          Your account is authenticated, but it does not have a landlord or renter role yet.
+        </p>
+        <Link
+          href="/auth/login"
+          className="inline-flex rounded-full border border-zinc-900/15 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-100"
+        >
+          Return to sign in
+        </Link>
+      </div>
+    );
   }
 
-  const userType = getUserTypeFromClaims(data.claims as Record<string, unknown>);
+  if (roles.length === 1) {
+    redirect(getHomeRouteForUserRoles(roles));
+  }
 
   return (
-    <p className="rounded-md bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-900">
-      Account type: {userType ? USER_TYPE_LABELS[userType] : "Unassigned"}
-    </p>
+    <div className="max-w-xl space-y-5">
+      <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">Choose your workspace</h1>
+      <p className="text-sm leading-relaxed text-zinc-600 sm:text-base">
+        This account has access to multiple roles. Choose which dashboard you want to enter.
+      </p>
+      <div className="grid gap-3">
+        {roles.map((role) => (
+          <Link
+            key={role}
+            href={getHomeRouteForUserType(role)}
+            className="inline-flex w-full items-center justify-between rounded-xl border border-zinc-900/15 bg-white px-4 py-3 text-sm font-medium text-zinc-900 transition hover:bg-zinc-100"
+          >
+            <span>{USER_TYPE_LABELS[role]} dashboard</span>
+            <span aria-hidden>{"->"}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
 export default function ProtectedPage() {
   return (
-    <div className="flex-1 w-full flex flex-col gap-12">
-      <div className="w-full">
-        <div className="bg-accent text-sm p-3 px-5 rounded-md text-foreground flex gap-3 items-center">
-          <InfoIcon size="16" strokeWidth={2} />
-          This is a protected page that you can only see as an authenticated
-          user
-        </div>
-      </div>
-      <div className="flex flex-col gap-2 items-start">
-        <h2 className="font-bold text-2xl mb-4">Your user details</h2>
-        <Suspense>
-          <UserTypeBadge />
-        </Suspense>
-        <pre className="text-xs font-mono p-3 rounded border max-h-32 overflow-auto">
-          <Suspense>
-            <UserDetails />
-          </Suspense>
-        </pre>
-      </div>
-      <div>
-        <h2 className="font-bold text-2xl mb-4">Next steps</h2>
-        <FetchDataSteps />
-      </div>
-    </div>
+    <Suspense>
+      <ProtectedResolver />
+    </Suspense>
   );
 }
