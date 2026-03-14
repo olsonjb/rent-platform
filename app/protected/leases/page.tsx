@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getLeases } from '@/app/actions/leases';
 import type { LeaseStatus } from '@/lib/types';
-import { connection } from 'next/server';
+import { Suspense } from 'react';
 
 const statusColors: Record<LeaseStatus, string> = {
   active: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
@@ -10,10 +10,39 @@ const statusColors: Record<LeaseStatus, string> = {
   terminated: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };
 
-export default async function LeasesPage() {
-  await connection();
+async function LeasesList() {
   const leases = await getLeases();
 
+  if (leases.length === 0) {
+    return <p className="text-muted-foreground">No leases yet. Add your first one.</p>;
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {leases.map((l) => (
+        <div key={l.id} className="border rounded-lg p-4 flex flex-col gap-2">
+          <div className="flex justify-between items-start">
+            <p className="font-semibold text-sm">{l.properties.address}</p>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[l.status]}`}>
+              {l.status}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {l.properties.city ?? ''}{l.properties.city && l.properties.state ? ', ' : ''}{l.properties.state ?? ''}
+          </p>
+          <p className="text-sm">{l.landlord_tenants.name}</p>
+          <p className="text-xs text-muted-foreground">{l.landlord_tenants.email}</p>
+          <p className="text-sm font-medium">${l.monthly_rent.toLocaleString()}/mo</p>
+          <p className="text-xs text-muted-foreground">
+            {l.start_date} → {l.end_date}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function LeasesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex justify-between items-center">
@@ -25,32 +54,9 @@ export default async function LeasesPage() {
           Add Lease
         </Link>
       </div>
-
-      {leases.length === 0 ? (
-        <p className="text-muted-foreground">No leases yet. Add your first one.</p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {leases.map((l) => (
-            <div key={l.id} className="border rounded-lg p-4 flex flex-col gap-2">
-              <div className="flex justify-between items-start">
-                <p className="font-semibold text-sm">{l.properties.address}</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[l.status]}`}>
-                  {l.status}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {l.properties.city ?? ''}{l.properties.city && l.properties.state ? ', ' : ''}{l.properties.state ?? ''}
-              </p>
-              <p className="text-sm">{l.landlord_tenants.name}</p>
-              <p className="text-xs text-muted-foreground">{l.landlord_tenants.email}</p>
-              <p className="text-sm font-medium">${l.monthly_rent.toLocaleString()}/mo</p>
-              <p className="text-xs text-muted-foreground">
-                {l.start_date} → {l.end_date}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+      <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
+        <LeasesList />
+      </Suspense>
     </div>
   );
 }

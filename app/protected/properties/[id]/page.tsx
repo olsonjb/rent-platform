@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import type { Lease } from '@/lib/types';
-import { connection } from 'next/server';
+import { Suspense } from 'react';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -12,9 +12,7 @@ function daysUntil(dateStr: string): number {
   return Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-export default async function PropertyDetailPage({ params }: PageProps) {
-  await connection();
-  const { id } = await params;
+async function PropertyDetail({ id }: { id: string }) {
   const supabase = await createClient();
 
   const { data: property, error } = await supabase
@@ -38,7 +36,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   const activeLeasedays = activeLease ? daysUntil(activeLease.end_date) : null;
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <>
       <div className="flex items-center gap-4">
         <Link href="/protected/properties" className="text-sm text-muted-foreground hover:text-foreground">
           ← Properties
@@ -95,6 +93,18 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+export default async function PropertyDetailPage({ params }: PageProps) {
+  const { id } = await params;
+
+  return (
+    <div className="flex flex-col gap-6 max-w-2xl">
+      <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
+        <PropertyDetail id={id} />
+      </Suspense>
     </div>
   );
 }

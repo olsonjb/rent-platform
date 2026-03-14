@@ -1,11 +1,28 @@
 import Link from 'next/link';
 import { getTenants } from '@/app/actions/tenants';
-import { connection } from 'next/server';
+import { Suspense } from 'react';
 
-export default async function TenantsPage() {
-  await connection();
+async function TenantsList() {
   const tenants = await getTenants();
 
+  if (tenants.length === 0) {
+    return <p className="text-muted-foreground">No tenants yet. Add your first one.</p>;
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {tenants.map((t) => (
+        <div key={t.id} className="border rounded-lg p-4 flex flex-col gap-2">
+          <p className="font-semibold">{t.name}</p>
+          <p className="text-sm text-muted-foreground">{t.email}</p>
+          {t.phone && <p className="text-sm">{t.phone}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function TenantsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex justify-between items-center">
@@ -17,20 +34,9 @@ export default async function TenantsPage() {
           Add Tenant
         </Link>
       </div>
-
-      {tenants.length === 0 ? (
-        <p className="text-muted-foreground">No tenants yet. Add your first one.</p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {tenants.map((t) => (
-            <div key={t.id} className="border rounded-lg p-4 flex flex-col gap-2">
-              <p className="font-semibold">{t.name}</p>
-              <p className="text-sm text-muted-foreground">{t.email}</p>
-              {t.phone && <p className="text-sm">{t.phone}</p>}
-            </div>
-          ))}
-        </div>
-      )}
+      <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
+        <TenantsList />
+      </Suspense>
     </div>
   );
 }
