@@ -20,6 +20,24 @@ export default function LandlordLayout({
               Dashboard
             </Link>
             <Link
+              href="/protected/properties"
+              className="rounded-full border border-zinc-900/15 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-100 sm:text-sm"
+            >
+              Properties
+            </Link>
+            <Link
+              href="/protected/tenants"
+              className="rounded-full border border-zinc-900/15 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-100 sm:text-sm"
+            >
+              Tenants
+            </Link>
+            <Link
+              href="/protected/leases"
+              className="rounded-full border border-zinc-900/15 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-100 sm:text-sm"
+            >
+              Leases
+            </Link>
+            <Link
               href="/landlord/maintenance-requests"
               className="rounded-full bg-zinc-950 px-4 py-2 text-xs font-semibold text-white transition hover:bg-zinc-800 sm:text-sm"
             >
