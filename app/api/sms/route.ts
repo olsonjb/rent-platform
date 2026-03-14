@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
-import { sendSms, toE164, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
+import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
+import { sendSms, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
@@ -134,14 +135,20 @@ export async function POST(request: NextRequest) {
   const { displayText, maintenanceRequests } = parseMaintenanceRequests(rawReply);
 
   // Insert all detected maintenance requests and notify landlord
+  let triggeredMaintenanceProcessor = false;
   for (const mr of maintenanceRequests) {
-    await supabase.from("maintenance_requests").insert({
+    const { error: maintenanceInsertError } = await supabase.from("maintenance_requests").insert({
       tenant_id: tenant.id,
       unit: tenant.unit,
       issue: mr.issue,
       urgency: mr.urgency,
       status: "pending",
     });
+
+    if (!maintenanceInsertError && !triggeredMaintenanceProcessor) {
+      triggerMaintenanceReviewProcessingInBackground();
+      triggeredMaintenanceProcessor = true;
+    }
 
     if (property.manager_phone) {
       const landlordMsg = buildLandlordSms({

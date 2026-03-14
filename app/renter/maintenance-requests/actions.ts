@@ -8,6 +8,7 @@ import {
   isMaintenanceRequestUrgency,
 } from "@/lib/maintenance-requests";
 import { getUserRolesFromClaims } from "@/lib/auth/user-types";
+import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { createClient } from "@/lib/supabase/server";
 
 const isNonEmptyString = (value: FormDataEntryValue | null): value is string => {
@@ -143,6 +144,8 @@ export async function createMaintenanceRequest(formData: FormData) {
   if (error) {
     redirectWithError("Unable to submit request. Please try again.");
   }
+
+  triggerMaintenanceReviewProcessingInBackground();
 
   revalidatePath("/renter/maintenance-requests");
   redirect("/renter/maintenance-requests?success=1");
