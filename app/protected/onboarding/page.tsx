@@ -1,10 +1,23 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getOnboardingStatus } from '@/app/actions/stripe';
 import { getUserRolesFromMetadata } from '@/lib/auth/user-types';
 import { PaymentOnboarding } from '@/components/pay-now-button';
 
-export default async function OnboardingPage({
+export default function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  return (
+    <Suspense fallback={<OnboardingFallback />}>
+      <OnboardingContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function OnboardingContent({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string }>;
@@ -70,6 +83,19 @@ export default async function OnboardingPage({
           monthlyFeeCents={onboarding?.monthlyFeeCents ?? 0}
         />
       )}
+    </div>
+  );
+}
+
+function OnboardingFallback() {
+  return (
+    <div className="mx-auto max-w-lg space-y-8 py-8">
+      <div className="space-y-2">
+        <div className="h-6 w-20 animate-pulse rounded-full bg-emerald-100" />
+        <div className="h-9 w-56 animate-pulse rounded bg-zinc-200" />
+        <div className="h-5 w-full animate-pulse rounded bg-zinc-100" />
+      </div>
+      <div className="h-56 animate-pulse rounded-xl border border-zinc-900/10 bg-white" />
     </div>
   );
 }

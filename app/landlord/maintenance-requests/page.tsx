@@ -95,8 +95,7 @@ async function LandlordMaintenanceRequestsContent() {
 
   const { data: propertyRows, error: propertiesError } = await supabase
     .from("properties")
-    .select("id, name, address")
-    .eq("landlord_id", user.id);
+    .select("id, name, address");
 
   if (propertiesError) {
     return (
@@ -109,59 +108,11 @@ async function LandlordMaintenanceRequestsContent() {
   const properties: PropertyRow[] = Array.isArray(propertyRows) ? (propertyRows as PropertyRow[]) : [];
   const propertyMap = new Map(properties.map((property) => [property.id, property]));
 
-  if (properties.length === 0) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-          Maintenance inbox
-        </h1>
-        <p className="rounded-xl border border-zinc-900/10 bg-white p-4 text-sm text-zinc-600 shadow-sm">
-          Add a property first to start receiving maintenance requests.
-        </p>
-      </div>
-    );
-  }
-
-  const propertyIds = properties.map((property) => property.id);
-
-  const { data: tenantRows, error: tenantsError } = await supabase
-    .from("tenants")
-    .select("id")
-    .in("property_id", propertyIds);
-
-  if (tenantsError) {
-    return (
-      <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-        Unable to load tenants right now.
-      </p>
-    );
-  }
-
-  const tenantIds = Array.isArray(tenantRows)
-    ? tenantRows
-        .map((row) => (typeof row.id === "string" ? row.id : null))
-        .filter((id): id is string => id !== null)
-    : [];
-
-  if (tenantIds.length === 0) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-          Maintenance inbox
-        </h1>
-        <p className="rounded-xl border border-zinc-900/10 bg-white p-4 text-sm text-zinc-600 shadow-sm">
-          No renter profiles are linked to your properties yet.
-        </p>
-      </div>
-    );
-  }
-
   const { data: requestRows, error: requestsError } = await supabase
     .from("maintenance_requests")
     .select(
       "id, issue, details, urgency, status, unit, created_at, tenants(name, property_id), maintenance_request_reviews(estimated_cost_min, estimated_cost_max, confidence, trade, summary, vendors)",
     )
-    .in("tenant_id", tenantIds)
     .order("created_at", { ascending: false });
 
   if (requestsError) {

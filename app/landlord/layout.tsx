@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,7 +31,19 @@ async function checkPaymentStatus() {
   }
 }
 
-export default async function LandlordLayout({
+export default function LandlordLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <Suspense fallback={<LandlordLayoutFallback />}>
+      <LandlordLayoutContent>{children}</LandlordLayoutContent>
+    </Suspense>
+  );
+}
+
+async function LandlordLayoutContent({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -78,6 +91,17 @@ export default async function LandlordLayout({
           </div>
         </nav>
         <div className="pb-6">{children}</div>
+      </div>
+    </main>
+  );
+}
+
+function LandlordLayoutFallback() {
+  return (
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_hsl(151_45%_94%),_hsl(0_0%_100%))]">
+      <div className="mx-auto flex w-full max-w-6xl flex-col px-5 pb-12 pt-6 sm:px-8">
+        <div className="mb-10 h-14 animate-pulse rounded-full border border-emerald-900/10 bg-white/70" />
+        <div className="h-32 animate-pulse rounded-2xl bg-white/70" />
       </div>
     </main>
   );
