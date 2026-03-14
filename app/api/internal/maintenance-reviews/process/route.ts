@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processQueuedMaintenanceReviews } from "@/lib/maintenance-review";
 
-const getWorkerSecret = (): string => {
-  const secret = process.env.MAINTENANCE_REVIEW_WORKER_SECRET;
+const getWorkerSecrets = (): string[] => {
+  const secrets = [
+    process.env.MAINTENANCE_REVIEW_WORKER_SECRET,
+    process.env.CRON_SECRET,
+  ].filter((secret): secret is string => typeof secret === "string" && secret.length > 0);
 
-  if (!secret) {
-    throw new Error("Missing MAINTENANCE_REVIEW_WORKER_SECRET");
+  if (secrets.length === 0) {
+    throw new Error("Missing MAINTENANCE_REVIEW_WORKER_SECRET or CRON_SECRET");
   }
 
-  return secret;
+  return secrets;
 };
 
 const parseBatchSize = (request: NextRequest): number | undefined => {
@@ -24,8 +27,13 @@ const parseBatchSize = (request: NextRequest): number | undefined => {
 
 const isAuthorized = (request: NextRequest): boolean => {
   const authorization = request.headers.get("authorization");
-  const expected = `Bearer ${getWorkerSecret()}`;
-  return authorization === expected;
+  const allowed = getWorkerSecrets();
+
+  if (!authorization) {
+    return false;
+  }
+
+  return allowed.some((secret) => authorization === `Bearer ${secret}`);
 };
 
 async function handleProcessRequest(request: NextRequest) {
