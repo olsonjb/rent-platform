@@ -50,7 +50,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           {property.city ?? ''}{property.city && property.state ? ', ' : ''}{property.state ?? ''} {property.zip ?? ''}
         </p>
         <p className="text-sm">
-          {property.bedrooms} bed · {property.bathrooms} bath
+          {property.bedrooms ?? '—'} bed · {property.bathrooms ?? '—'} bath
         </p>
         <p className="font-medium">${Number(property.monthly_rent ?? 0).toLocaleString()}/mo</p>
       </div>

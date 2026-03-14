@@ -29,6 +29,7 @@ export interface LandlordTenant {
   phone: string | null;
   auth_user_id?: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Lease {
@@ -41,6 +42,7 @@ export interface Lease {
   monthly_rent: number;
   status: LeaseStatus;
   created_at: string;
+  updated_at: string;
 }
 
 export interface LeaseWithRelations extends Lease {

@@ -34,6 +34,7 @@ export async function createProperty(formData: FormData) {
     bedrooms: parseInt(formData.get('bedrooms') as string, 10),
     bathrooms: parseFloat(formData.get('bathrooms') as string),
     monthly_rent: parseFloat(formData.get('monthly_rent') as string),
+    rent_due_day: parseInt(formData.get('rent_due_day') as string, 10) || 1,
   });
 
   if (error) throw error;

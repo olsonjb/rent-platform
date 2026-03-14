@@ -38,7 +38,8 @@ create table if not exists public.landlord_tenants (
   email text not null,
   phone text,
   auth_user_id uuid references auth.users(id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 alter table public.landlord_tenants enable row level security;
@@ -91,8 +92,26 @@ create table if not exists public.leases (
   monthly_rent numeric(10,2) not null,
   status public.lease_status not null default 'pending',
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   constraint leases_date_range_check check (end_date > start_date)
 );
+
+-- Auto-update updated_at on row modification
+create or replace function public.set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger landlord_tenants_updated_at
+  before update on public.landlord_tenants
+  for each row execute function public.set_updated_at();
+
+create trigger leases_updated_at
+  before update on public.leases
+  for each row execute function public.set_updated_at();
 
 alter table public.leases enable row level security;
 
