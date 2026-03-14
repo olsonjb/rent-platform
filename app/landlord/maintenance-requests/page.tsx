@@ -31,10 +31,16 @@ type MaintenanceRequestRow = {
   status: string;
   unit: string;
   created_at: string;
-  tenants: Array<{
-    name: string;
-    property_id: string | null;
-  }> | null;
+  tenants:
+    | {
+        name: string;
+        property_id: string | null;
+      }
+    | Array<{
+      name: string;
+      property_id: string | null;
+    }>
+    | null;
   maintenance_request_reviews: MaintenanceReview[] | MaintenanceReview | null;
 };
 
@@ -172,7 +178,9 @@ async function LandlordMaintenanceRequestsContent() {
               ? MAINTENANCE_REQUEST_STATUS_LABELS[request.status]
               : request.status;
 
-            const tenant = Array.isArray(request.tenants) ? request.tenants[0] : null;
+            const tenant = Array.isArray(request.tenants)
+              ? request.tenants[0] ?? null
+              : request.tenants;
             const property =
               tenant?.property_id && propertyMap.has(tenant.property_id)
                 ? propertyMap.get(tenant.property_id)
