@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
 
   const webhookSecret = WEBHOOK_SECRETS[stripeMode];
   if (!webhookSecret) {
-    const varName = stripeMode === 'demo' ? 'STRIPE_TEST_WEBHOOK_SECRET' : 'STRIPE_LIVE_WEBHOOK_SECRET';
+    const varName =
+      stripeMode === 'demo' ? 'STRIPE_TEST_WEBHOOK_SECRET' : 'STRIPE_LIVE_WEBHOOK_SECRET';
     console.error(`${varName} is not configured`);
     return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
   }
@@ -27,19 +28,56 @@ export async function POST(req: NextRequest) {
     const body = Buffer.from(await req.bytes());
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err) {
-    // Log server-side for debugging; return generic message to caller
-    console.error('Webhook signature verification failed:', err instanceof Error ? err.message : err);
+    console.error(
+      'Webhook signature verification failed:',
+      err instanceof Error ? err.message : err,
+    );
     return NextResponse.json({ error: 'Webhook verification failed' }, { status: 400 });
   }
 
+  const supabase = createServiceClient();
+
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
-    const supabase = createServiceClient();
 
-    // Resolve customer — Stripe may return a string ID or an expanded object
+    // Handle setup mode — card authorized, not charged
+    if (session.mode === 'setup') {
+      const userId = session.client_reference_id ?? session.metadata?.supabase_user_id;
+      const setupIntentId =
+        typeof session.setup_intent === 'string' ? session.setup_intent : null;
+
+      if (!userId) {
+        console.error('No user ID found in setup session');
+        return NextResponse.json({ error: 'Missing user reference' }, { status: 400 });
+      }
+
+      let paymentMethodId: string | null = null;
+      if (setupIntentId) {
+        const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+        paymentMethodId =
+          typeof setupIntent.payment_method === 'string' ? setupIntent.payment_method : null;
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          payment_status: 'authorized',
+          stripe_setup_intent_id: setupIntentId,
+          stripe_payment_method_id: paymentMethodId,
+        })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('Failed to update profile payment status:', error);
+        return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
+      }
+
+      return NextResponse.json({ received: true });
+    }
+
+    // Handle one-time payment sessions
     const customerId = typeof session.customer === 'string' ? session.customer : null;
 
-    // Idempotency: skip if already succeeded (Stripe retries webhooks on non-2xx)
     const { data: existing } = await supabase
       .from('payments')
       .select('status')
