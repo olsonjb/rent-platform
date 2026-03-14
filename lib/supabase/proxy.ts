@@ -1,5 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  canAccessPathForUserRoles,
+  getHomeRouteForUserRoles,
+} from "@/lib/auth/authorization";
+import { getUserRolesFromClaims } from "@/lib/auth/user-types";
 import { hasEnvVars } from "../utils";
 import { getSupabaseEnv } from "./env";
 
@@ -60,6 +65,16 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
     return NextResponse.redirect(url);
+  }
+
+  if (user) {
+    const roles = getUserRolesFromClaims(user);
+
+    if (!canAccessPathForUserRoles(request.nextUrl.pathname, roles)) {
+      const url = request.nextUrl.clone();
+      url.pathname = roles.length > 0 ? getHomeRouteForUserRoles(roles) : "/auth/login";
+      return NextResponse.redirect(url);
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
