@@ -8,6 +8,11 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+async function ResolvedPropertyDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <PropertyDetail id={id} />;
+}
+
 function daysUntil(dateStr: string): number {
   return Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
@@ -97,13 +102,11 @@ async function PropertyDetail({ id }: { id: string }) {
   );
 }
 
-export default async function PropertyDetailPage({ params }: PageProps) {
-  const { id } = await params;
-
+export default function PropertyDetailPage({ params }: PageProps) {
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
       <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
-        <PropertyDetail id={id} />
+        <ResolvedPropertyDetail params={params} />
       </Suspense>
     </div>
   );
