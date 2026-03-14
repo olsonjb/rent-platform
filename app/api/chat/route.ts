@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
-import { sendSms, toE164, buildLandlordSms } from "@/lib/twilio/sms";
+import { sendSms, buildLandlordSms } from "@/lib/twilio/sms";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -12,32 +12,38 @@ interface MaintenanceRequest {
   urgency: "habitability" | "standard";
 }
 
-function parseMaintenanceRequest(
+function parseMaintenanceRequests(
   text: string
-): { displayText: string; maintenanceRequest: MaintenanceRequest | null } {
+): { displayText: string; maintenanceRequests: MaintenanceRequest[] } {
   const delimiter = "|||MAINTENANCE_REQUEST|||";
   const endDelimiter = "|||END|||";
 
-  const startIdx = text.indexOf(delimiter);
-  if (startIdx === -1) {
-    return { displayText: text.trim(), maintenanceRequest: null };
-  }
+  const firstIdx = text.indexOf(delimiter);
+  if (firstIdx === -1) return { displayText: text.trim(), maintenanceRequests: [] };
 
-  const displayText = text.slice(0, startIdx).trim();
-  const jsonStart = startIdx + delimiter.length;
-  const jsonEnd = text.indexOf(endDelimiter, jsonStart);
-  const jsonStr = text.slice(jsonStart, jsonEnd === -1 ? undefined : jsonEnd).trim();
+  const displayText = text.slice(0, firstIdx).trim();
+  const requests: MaintenanceRequest[] = [];
 
-  try {
-    const parsed = JSON.parse(jsonStr);
-    if (parsed.issue && parsed.urgency) {
-      return { displayText, maintenanceRequest: parsed as MaintenanceRequest };
+  let searchFrom = 0;
+  while (true) {
+    const start = text.indexOf(delimiter, searchFrom);
+    if (start === -1) break;
+    const jsonStart = start + delimiter.length;
+    const end = text.indexOf(endDelimiter, jsonStart);
+    if (end === -1) break;
+    const jsonStr = text.slice(jsonStart, end).trim();
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.issue && parsed.urgency) {
+        requests.push(parsed as MaintenanceRequest);
+      }
+    } catch {
+      // ignore malformed block
     }
-  } catch {
-    // Failed to parse, treat as no maintenance request
+    searchFrom = end + endDelimiter.length;
   }
 
-  return { displayText, maintenanceRequest: null };
+  return { displayText, maintenanceRequests: requests };
 }
 
 export async function POST(request: NextRequest) {
@@ -85,13 +91,15 @@ export async function POST(request: NextRequest) {
       tenant_id: user.id,
       role: "user",
       content: message,
+      channel: "web",
     });
 
-    // Load conversation history
+    // Load web conversation history only
     const { data: history } = await supabase
       .from("chat_messages")
       .select("role, content")
       .eq("tenant_id", user.id)
+      .eq("channel", "web")
       .order("created_at", { ascending: true })
       .limit(50);
 
@@ -127,27 +135,28 @@ export async function POST(request: NextRequest) {
     const rawReply =
       response.content[0].type === "text" ? response.content[0].text : "";
 
-    const { displayText, maintenanceRequest } =
-      parseMaintenanceRequest(rawReply);
+    const { displayText, maintenanceRequests } = parseMaintenanceRequests(rawReply);
 
-    // If maintenance request detected, insert it and notify landlord via SMS
-    let maintenanceRecord = null;
-    if (maintenanceRequest) {
+    // Insert all detected maintenance requests and notify landlord
+    const insertedRequests = [];
+    let triggeredMaintenanceProcessor = false;
+    for (const mr of maintenanceRequests) {
       const { data: mrData, error: maintenanceInsertError } = await supabase
         .from("maintenance_requests")
         .insert({
           tenant_id: user.id,
           unit: tenant.unit,
-          issue: maintenanceRequest.issue,
-          urgency: maintenanceRequest.urgency,
+          issue: mr.issue,
+          urgency: mr.urgency,
           status: "pending",
         })
         .select()
         .single();
-      maintenanceRecord = mrData;
+      if (mrData) insertedRequests.push(mrData);
 
-      if (!maintenanceInsertError) {
+      if (!maintenanceInsertError && !triggeredMaintenanceProcessor) {
         triggerMaintenanceReviewProcessingInBackground();
+        triggeredMaintenanceProcessor = true;
       }
 
       if (property.manager_phone) {
@@ -156,10 +165,10 @@ export async function POST(request: NextRequest) {
           unit: tenant.unit,
           tenantName: tenant.name,
           tenantPhone: tenantWithPhone.phone ?? null,
-          issue: maintenanceRequest.issue,
-          urgency: maintenanceRequest.urgency,
+          issue: mr.issue,
+          urgency: mr.urgency,
         });
-        await sendSms(toE164(property.manager_phone), landlordMsg).catch(
+        await sendSms(property.manager_phone, landlordMsg).catch(
           (err) => console.error("Failed to SMS landlord:", err)
         );
       }
@@ -170,11 +179,12 @@ export async function POST(request: NextRequest) {
       tenant_id: user.id,
       role: "assistant",
       content: displayText,
+      channel: "web",
     });
 
     return NextResponse.json({
       reply: displayText,
-      maintenanceRequest: maintenanceRecord,
+      maintenanceRequests: insertedRequests,
     });
   } catch (error) {
     console.error("Chat API error:", error);

@@ -1,10 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
-
-export interface AIContent {
-  title: string;
-  description: string;
-  highlights: string[];
-}
+import type { AIContent } from '@/lib/types';
+export type { AIContent };
 
 interface ContentInput {
   property: {
@@ -51,5 +47,9 @@ Respond with ONLY valid JSON:
   if (!json) {
     return { title: `${input.property.address} for Rent`, description: 'Rental property available.', highlights: [] };
   }
-  return JSON.parse(json) as AIContent;
+  try {
+    return JSON.parse(json) as AIContent;
+  } catch {
+    return { title: `${input.property.address} for Rent`, description: 'Rental property available.', highlights: [] };
+  }
 }

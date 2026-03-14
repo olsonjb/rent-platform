@@ -1,11 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
-
-export interface AIDecision {
-  should_list: boolean;
-  reasoning: string;
-  suggested_rent: number | null;
-  urgency: 'high' | 'medium' | 'low';
-}
+import type { AIDecision } from '@/lib/types';
+export type { AIDecision };
 
 interface DecisionInput {
   property: {
@@ -68,5 +63,9 @@ Respond with ONLY valid JSON:
   if (!json) {
     return { should_list: false, reasoning: 'Failed to parse AI response', suggested_rent: null, urgency: 'low' };
   }
-  return JSON.parse(json) as AIDecision;
+  try {
+    return JSON.parse(json) as AIDecision;
+  } catch {
+    return { should_list: false, reasoning: 'Failed to parse AI response', suggested_rent: null, urgency: 'low' };
+  }
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 async function checkPaymentStatus() {
   const supabase = await createClient();
@@ -11,7 +12,8 @@ async function checkPaymentStatus() {
 
   if (!user) return redirect("/auth/login");
 
-  const { data: profile } = await supabase
+  const svc = createServiceClient();
+  const { data: profile } = await svc
     .from("profiles")
     .select("payment_status, trial_ends_at")
     .eq("id", user.id)
@@ -63,24 +65,6 @@ async function LandlordLayoutContent({
               className="rounded-full border border-zinc-900/15 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-100 sm:text-sm"
             >
               Dashboard
-            </Link>
-            <Link
-              href="/protected/properties"
-              className="rounded-full border border-zinc-900/15 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-100 sm:text-sm"
-            >
-              Properties
-            </Link>
-            <Link
-              href="/protected/tenants"
-              className="rounded-full border border-zinc-900/15 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-100 sm:text-sm"
-            >
-              Tenants
-            </Link>
-            <Link
-              href="/protected/leases"
-              className="rounded-full border border-zinc-900/15 px-4 py-2 text-xs font-semibold text-zinc-900 transition hover:bg-zinc-100 sm:text-sm"
-            >
-              Leases
             </Link>
             <Link
               href="/landlord/maintenance-requests"
