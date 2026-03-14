@@ -2,7 +2,12 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { stripe } from '@/lib/stripe';
+import { stripe, stripeMode } from '@/lib/stripe';
+
+const PRICE_IDS = {
+  demo: process.env.STRIPE_TEST_PRICE_ID,
+  monetize: process.env.STRIPE_LIVE_PRICE_ID,
+} as const;
 
 export async function createCheckoutSession() {
   const supabase = await createClient();
@@ -48,26 +53,21 @@ export async function createCheckoutSession() {
     stripeCustomerId = updated?.stripe_customer_id ?? customer.id;
   }
 
+  const priceId = PRICE_IDS[stripeMode];
+  if (!priceId) {
+    const varName = stripeMode === 'demo' ? 'STRIPE_TEST_PRICE_ID' : 'STRIPE_LIVE_PRICE_ID';
+    throw new Error(`Missing ${varName}`);
+  }
+
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
-  // Create Stripe Checkout session
+  // Create Stripe Checkout session using a pre-configured Price ID so pricing
+  // is managed in the Stripe Dashboard, not in code.
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
     customer: stripeCustomerId,
     client_reference_id: user.id,
-    line_items: [
-      {
-        price_data: {
-          currency: 'usd',
-          unit_amount: 999, // $9.99
-          product_data: {
-            name: 'Property Listing',
-            description: 'Auto PM — property listing fee',
-          },
-        },
-        quantity: 1,
-      },
-    ],
+    line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${baseUrl}/protected/payments?status=success`,
     cancel_url: `${baseUrl}/protected/payments?status=cancelled`,
   });
