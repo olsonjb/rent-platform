@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 async function checkPaymentStatus() {
   const supabase = await createClient();
@@ -11,7 +12,8 @@ async function checkPaymentStatus() {
 
   if (!user) return redirect("/auth/login");
 
-  const { data: profile } = await supabase
+  const svc = createServiceClient();
+  const { data: profile } = await svc
     .from("profiles")
     .select("payment_status, trial_ends_at")
     .eq("id", user.id)
