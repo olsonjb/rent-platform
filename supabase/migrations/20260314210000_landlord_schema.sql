@@ -26,6 +26,10 @@ create policy "landlord delete own properties"
   on public.properties for delete
   using (auth.uid() = landlord_id);
 
+-- Index for landlord property lookups
+create index if not exists properties_landlord_id_idx
+  on public.properties (landlord_id) where landlord_id is not null;
+
 -- Landlord-managed tenant contacts (separate from auth-linked tenants table)
 create table if not exists public.landlord_tenants (
   id uuid primary key default gen_random_uuid(),
@@ -55,11 +59,23 @@ create policy "landlord delete own landlord_tenants"
   on public.landlord_tenants for delete
   using (auth.uid() = landlord_id);
 
--- Lease status enum (idempotent)
+-- Indexes for landlord_tenants
+create index if not exists landlord_tenants_landlord_id_idx
+  on public.landlord_tenants (landlord_id);
+
+-- Prevent duplicate tenant emails per landlord
+create unique index if not exists landlord_tenants_email_uniq
+  on public.landlord_tenants (landlord_id, lower(email));
+
+-- Lease status enum (idempotent, schema-aware)
 do $$
 begin
-  if not exists (select 1 from pg_type where typname = 'lease_status') then
-    create type lease_status as enum ('active', 'pending', 'expired', 'terminated');
+  if not exists (
+    select 1 from pg_type t
+    join pg_namespace n on t.typnamespace = n.oid
+    where t.typname = 'lease_status' and n.nspname = 'public'
+  ) then
+    create type public.lease_status as enum ('active', 'pending', 'expired', 'terminated');
   end if;
 end
 $$;
@@ -73,8 +89,9 @@ create table if not exists public.leases (
   start_date date not null,
   end_date date not null,
   monthly_rent numeric(10,2) not null,
-  status lease_status not null default 'pending',
-  created_at timestamptz not null default now()
+  status public.lease_status not null default 'pending',
+  created_at timestamptz not null default now(),
+  constraint leases_date_range_check check (end_date > start_date)
 );
 
 alter table public.leases enable row level security;
@@ -94,3 +111,16 @@ create policy "landlord update own leases"
 create policy "landlord delete own leases"
   on public.leases for delete
   using (auth.uid() = landlord_id);
+
+-- Indexes for leases
+create index if not exists leases_landlord_id_idx
+  on public.leases (landlord_id);
+
+create index if not exists leases_property_id_idx
+  on public.leases (property_id);
+
+create index if not exists leases_tenant_id_idx
+  on public.leases (tenant_id);
+
+create index if not exists leases_property_status_idx
+  on public.leases (property_id, status);

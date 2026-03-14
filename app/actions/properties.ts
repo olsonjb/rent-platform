@@ -12,6 +12,7 @@ export async function getProperties(): Promise<Property[]> {
   const { data, error } = await supabase
     .from('properties')
     .select('*')
+    .eq('landlord_id', user.id)
     .order('created_at', { ascending: false });
 
   if (error) throw error;

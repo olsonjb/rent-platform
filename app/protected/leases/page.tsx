@@ -37,7 +37,7 @@ export default async function LeasesPage() {
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">
-                {l.properties.city}, {l.properties.state}
+                {l.properties.city ?? ''}{l.properties.city && l.properties.state ? ', ' : ''}{l.properties.state ?? ''}
               </p>
               <p className="text-sm">{l.landlord_tenants.name}</p>
               <p className="text-xs text-muted-foreground">{l.landlord_tenants.email}</p>
