@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getProperties, linkRenterToProperty } from '@/app/actions/properties';
+import { getTenants } from '@/app/actions/tenants';
 import { Suspense } from 'react';
 
 type PropertiesPageProps = {
@@ -11,6 +12,7 @@ type PropertiesPageProps = {
 
 async function PropertiesList() {
   const properties = await getProperties();
+  const tenants = await getTenants();
 
   if (properties.length === 0) {
     return <p className="text-muted-foreground">No properties yet. Add your first one.</p>;
@@ -34,17 +36,26 @@ async function PropertiesList() {
           <form action={linkRenterToProperty} className="border-t pt-3 mt-1 flex flex-col gap-2">
             <input type="hidden" name="property_id" value={p.id} />
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">Link renter</p>
-            <label className="text-xs text-muted-foreground" htmlFor={`renter-id-${p.id}`}>
-              Renter user ID
+            <label className="text-xs text-muted-foreground" htmlFor={`tenant-${p.id}`}>
+              Added tenant
             </label>
-            <input
-              id={`renter-id-${p.id}`}
-              name="renter_id"
-              type="text"
+            <select
+              id={`tenant-${p.id}`}
+              name="landlord_tenant_id"
               required
-              placeholder="auth user UUID"
+              defaultValue=""
+              disabled={tenants.length === 0}
               className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+            >
+              <option value="" disabled>
+                Select a tenant
+              </option>
+              {tenants.map((tenant) => (
+                <option key={tenant.id} value={tenant.id}>
+                  {tenant.name} ({tenant.email})
+                </option>
+              ))}
+            </select>
             <label className="text-xs text-muted-foreground" htmlFor={`unit-${p.id}`}>
               Unit
             </label>
@@ -58,10 +69,16 @@ async function PropertiesList() {
             />
             <button
               type="submit"
+              disabled={tenants.length === 0}
               className="bg-zinc-950 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-zinc-800 transition-colors"
             >
               Link renter
             </button>
+            {tenants.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Add tenants first in the Tenants page before linking them to a property.
+              </p>
+            ) : null}
           </form>
         </article>
       ))}

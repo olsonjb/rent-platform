@@ -54,15 +54,15 @@ const redirectToPropertiesWithStatus = (key: 'link_error' | 'link_success', mess
 
 export async function linkRenterToProperty(formData: FormData) {
   const propertyIdValue = formData.get('property_id');
-  const renterIdValue = formData.get('renter_id');
+  const landlordTenantIdValue = formData.get('landlord_tenant_id');
   const unitValue = formData.get('unit');
 
   const propertyId = isNonEmptyString(propertyIdValue)
     ? propertyIdValue.trim()
     : redirectToPropertiesWithStatus('link_error', 'Property is required.');
-  const renterId = isNonEmptyString(renterIdValue)
-    ? renterIdValue.trim()
-    : redirectToPropertiesWithStatus('link_error', 'Renter user ID is required.');
+  const landlordTenantId = isNonEmptyString(landlordTenantIdValue)
+    ? landlordTenantIdValue.trim()
+    : redirectToPropertiesWithStatus('link_error', 'Please select a tenant.');
   const unit = isNonEmptyString(unitValue)
     ? unitValue.trim()
     : redirectToPropertiesWithStatus('link_error', 'Unit number is required.');
@@ -87,7 +87,56 @@ export async function linkRenterToProperty(formData: FormData) {
     redirectToPropertiesWithStatus('link_error', 'Property was not found for your account.');
   }
 
+  const { data: landlordTenant, error: landlordTenantError } = await supabase
+    .from('landlord_tenants')
+    .select('id, name, email, phone, auth_user_id')
+    .eq('id', landlordTenantId)
+    .eq('landlord_id', user.id)
+    .maybeSingle();
+
+  if (landlordTenantError) {
+    redirectToPropertiesWithStatus('link_error', 'Selected tenant was not found.');
+  }
+
+  const selectedTenant =
+    landlordTenant ?? redirectToPropertiesWithStatus('link_error', 'Selected tenant was not found.');
+
   const serviceClient = createServiceClient();
+
+  let renterId = selectedTenant.auth_user_id;
+
+  if (!renterId) {
+    const normalizedEmail = selectedTenant.email.trim().toLowerCase();
+    const { data: authUser, error: authUserError } = await serviceClient
+      .schema('auth')
+      .from('users')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .maybeSingle();
+
+    if (authUserError) {
+      redirectToPropertiesWithStatus('link_error', 'Unable to validate tenant account right now.');
+    }
+
+    const authUserId =
+      authUser?.id ??
+      redirectToPropertiesWithStatus(
+        'link_error',
+        `No renter account found for ${selectedTenant.email}. Ask them to sign up first.`,
+      );
+
+    renterId = authUserId;
+
+    const { error: linkTenantAuthError } = await supabase
+      .from('landlord_tenants')
+      .update({ auth_user_id: renterId })
+      .eq('id', selectedTenant.id)
+      .eq('landlord_id', user.id);
+
+    if (linkTenantAuthError) {
+      redirectToPropertiesWithStatus('link_error', 'Unable to save tenant account link right now.');
+    }
+  }
 
   const { data: tenant, error: tenantLookupError } = await serviceClient
     .from('tenants')
@@ -120,13 +169,14 @@ export async function linkRenterToProperty(formData: FormData) {
       id: renterId,
       property_id: propertyId,
       unit,
-      name: 'Resident',
+      name: selectedTenant.name,
+      phone: selectedTenant.phone,
     });
 
     if (insertError) {
       redirectToPropertiesWithStatus(
         'link_error',
-        'Could not create renter profile. Confirm the renter user ID is valid.',
+        'Could not create renter profile from selected tenant.',
       );
     }
   }
