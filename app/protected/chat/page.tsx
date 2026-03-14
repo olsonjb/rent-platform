@@ -27,6 +27,7 @@ export default function ChatPage() {
       const { data } = await supabase
         .from("chat_messages")
         .select("id, role, content")
+        .eq("channel", "web")
         .order("created_at", { ascending: true });
       if (data) {
         setMessages(data as Message[]);
