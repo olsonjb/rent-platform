@@ -1,7 +1,9 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { Property } from '@/lib/types';
 
 export async function getProperties(): Promise<Property[]> {
@@ -39,4 +41,202 @@ export async function createProperty(formData: FormData) {
 
   if (error) throw error;
   redirect('/protected/properties');
+}
+
+const isNonEmptyString = (value: FormDataEntryValue | null): value is string => {
+  return typeof value === 'string' && value.trim().length > 0;
+};
+
+const redirectToPropertiesWithStatus = (key: 'link_error' | 'link_success', message: string): never => {
+  const params = new URLSearchParams({ [key]: message });
+  redirect(`/protected/properties?${params.toString()}`);
+};
+
+const redirectToPropertyDetailWithStatus = (
+  propertyId: string,
+  key: 'link_error' | 'link_success',
+  message: string,
+): never => {
+  const params = new URLSearchParams({ [key]: message });
+  redirect(`/protected/properties/${propertyId}?${params.toString()}`);
+};
+
+const getAuthUserIdByEmail = async (
+  email: string,
+): Promise<{ userId: string | null; lookupError: boolean }> => {
+  const serviceClient = createServiceClient();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  let page = 1;
+  while (page <= 10) {
+    const { data, error } = await serviceClient.auth.admin.listUsers({ page, perPage: 200 });
+
+    if (error) {
+      return { userId: null, lookupError: true };
+    }
+
+    const users = data?.users ?? [];
+    const matchedUser = users.find(
+      (existingUser) => existingUser.email?.trim().toLowerCase() === normalizedEmail,
+    );
+
+    if (matchedUser?.id) {
+      return { userId: matchedUser.id, lookupError: false };
+    }
+
+    if (users.length < 200) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return { userId: null, lookupError: false };
+};
+
+export async function linkRenterToProperty(formData: FormData) {
+  const propertyIdValue = formData.get('property_id');
+  const landlordTenantIdValue = formData.get('landlord_tenant_id');
+  const unitValue = formData.get('unit');
+
+  const propertyId = isNonEmptyString(propertyIdValue)
+    ? propertyIdValue.trim()
+    : redirectToPropertiesWithStatus('link_error', 'Property is required.');
+  const landlordTenantId = isNonEmptyString(landlordTenantIdValue)
+    ? landlordTenantIdValue.trim()
+    : redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Please select a tenant.');
+  const unit = isNonEmptyString(unitValue)
+    ? unitValue.trim()
+    : redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Unit number is required.');
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/auth/login');
+  }
+
+  const { data: property, error: propertyError } = await supabase
+    .from('properties')
+    .select('id')
+    .eq('id', propertyId)
+    .eq('landlord_id', user.id)
+    .maybeSingle();
+
+  if (propertyError || !property) {
+    redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Property was not found for your account.');
+  }
+
+  const { data: landlordTenant, error: landlordTenantError } = await supabase
+    .from('landlord_tenants')
+    .select('id, name, email, phone, auth_user_id')
+    .eq('id', landlordTenantId)
+    .eq('landlord_id', user.id)
+    .maybeSingle();
+
+  if (landlordTenantError) {
+    redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Selected tenant was not found.');
+  }
+
+  const selectedTenant =
+    landlordTenant ??
+    redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Selected tenant was not found.');
+
+  let renterId = selectedTenant.auth_user_id;
+
+  if (!renterId) {
+    const { userId: matchedAuthUserId, lookupError } = await getAuthUserIdByEmail(
+      selectedTenant.email,
+    );
+
+    if (lookupError) {
+      redirectToPropertyDetailWithStatus(
+        propertyId,
+        'link_error',
+        'Unable to validate tenant account right now.',
+      );
+    }
+
+    const authUserId =
+      matchedAuthUserId ??
+      redirectToPropertyDetailWithStatus(
+        propertyId,
+        'link_error',
+        `No renter account found for ${selectedTenant.email}. Ask them to sign up first.`,
+      );
+
+    renterId = authUserId;
+
+    const { error: linkTenantAuthError } = await supabase
+      .from('landlord_tenants')
+      .update({ auth_user_id: renterId })
+      .eq('id', selectedTenant.id)
+      .eq('landlord_id', user.id);
+
+    if (linkTenantAuthError) {
+      redirectToPropertyDetailWithStatus(
+        propertyId,
+        'link_error',
+        'Unable to save tenant account link right now.',
+      );
+    }
+  }
+
+  const serviceClient = createServiceClient();
+
+  const { data: tenant, error: tenantLookupError } = await serviceClient
+    .from('tenants')
+    .select('id, property_id')
+    .eq('id', renterId)
+    .maybeSingle();
+
+  if (tenantLookupError) {
+    redirectToPropertyDetailWithStatus(
+      propertyId,
+      'link_error',
+      'Unable to find renter profile right now.',
+    );
+  }
+
+  if (tenant?.property_id && tenant.property_id !== propertyId) {
+    redirectToPropertyDetailWithStatus(
+      propertyId,
+      'link_error',
+      'This renter is already linked to another property.',
+    );
+  }
+
+  if (tenant) {
+    const { error: updateError } = await serviceClient
+      .from('tenants')
+      .update({ property_id: propertyId, unit })
+      .eq('id', renterId);
+
+    if (updateError) {
+      redirectToPropertyDetailWithStatus(propertyId, 'link_error', 'Unable to link renter right now.');
+    }
+  } else {
+    const { error: insertError } = await serviceClient.from('tenants').insert({
+      id: renterId,
+      property_id: propertyId,
+      unit,
+      name: selectedTenant.name,
+      phone: selectedTenant.phone,
+    });
+
+    if (insertError) {
+      redirectToPropertyDetailWithStatus(
+        propertyId,
+        'link_error',
+        'Could not create renter profile from selected tenant.',
+      );
+    }
+  }
+
+  revalidatePath('/protected/properties');
+  revalidatePath(`/protected/properties/${propertyId}`);
+  revalidatePath('/landlord/maintenance-requests');
+  redirectToPropertyDetailWithStatus(propertyId, 'link_success', 'Renter linked successfully.');
 }
