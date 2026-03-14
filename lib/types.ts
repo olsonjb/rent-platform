@@ -78,6 +78,44 @@ export interface Listing {
   updated_at: string;
 }
 
+export type ApplicationStatus = 'pending' | 'screening' | 'approved' | 'denied' | 'landlord_approved' | 'landlord_denied' | 'withdrawn';
+
+export interface ScreeningDecision {
+  approved: boolean;
+  reasoning: string;
+  risk_score: number;
+  income_ratio: number;
+  flags: string[];
+  confidence: number;
+  social_media_notes: string | null;
+}
+
+export interface RentalApplication {
+  id: string;
+  listing_id: string | null;
+  property_id: string;
+  applicant_id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  credit_score_range: string;
+  monthly_income: number;
+  employer_name: string | null;
+  employment_duration_months: number | null;
+  employment_type: string | null;
+  years_renting: number;
+  previous_evictions: boolean;
+  references: { name: string; phone: string; relationship: string }[];
+  social_media_links: string[];
+  ai_decision: ScreeningDecision;
+  status: ApplicationStatus;
+  landlord_notes: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LeaseWithRelations extends Lease {
   properties: {
     address: string;
