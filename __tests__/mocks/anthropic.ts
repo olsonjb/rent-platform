@@ -30,9 +30,11 @@ export function resetAnthropicMock() {
 /** The mock constructor — returned from vi.mock("@anthropic-ai/sdk"). */
 export function installAnthropicMock() {
   vi.mock("@anthropic-ai/sdk", () => {
-    const MockAnthropic = vi.fn().mockImplementation(() => ({
-      messages: { create: messagesCreate },
-    }));
+    function MockAnthropic() {
+      return {
+        messages: { create: messagesCreate },
+      };
+    }
     return { default: MockAnthropic };
   });
 }
