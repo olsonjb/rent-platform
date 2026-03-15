@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { getStripe } from '@/lib/stripe';
+import { getStripe, getStripeMode } from '@/lib/stripe';
 
 /**
  * Ensure a Stripe customer exists for the current user. Returns the customer ID.

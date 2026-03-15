@@ -4,7 +4,7 @@ const FAILURE_RATE = parseFloat(process.env.MOCK_FAILURE_RATE ?? '0.1');
 
 export const apartmentsProvider: ListingProvider = {
   name: 'Apartments.com',
-  async submit(_listing: PropertyListing): Promise<SubmitResult> {
+  async submit(listing: PropertyListing): Promise<SubmitResult> {
     await new Promise((r) => setTimeout(r, 300 + Math.random() * 800));
 
     if (Math.random() < FAILURE_RATE) {
