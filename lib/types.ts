@@ -78,7 +78,7 @@ export interface Listing {
   updated_at: string;
 }
 
-export type ApplicationStatus = 'pending' | 'screening' | 'approved' | 'denied' | 'landlord_approved' | 'landlord_denied' | 'withdrawn';
+export type ApplicationStatus = 'pending' | 'screening' | 'ai_reviewed' | 'approved' | 'denied' | 'landlord_approved' | 'landlord_denied' | 'withdrawn';
 
 export interface ScreeningDecision {
   approved: boolean;
@@ -109,6 +109,9 @@ export interface RentalApplication {
   social_media_links: string[];
   ai_decision: ScreeningDecision;
   status: ApplicationStatus;
+  ai_recommendation: string | null;
+  ai_recommendation_confidence: number | null;
+  adverse_action_notice: string | null;
   landlord_notes: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
