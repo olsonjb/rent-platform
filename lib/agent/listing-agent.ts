@@ -1,11 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/service';
-import { createLogger } from '@/lib/logger';
 import { makeListingDecision, type AIDecision } from './decision';
 import { generateListingContent, type AIContent } from './content';
 import { submitToProviders } from './submit';
 import type { PropertyListing } from '@/lib/providers';
-
-const logger = createLogger('listing-agent');
 
 interface ExpiringLease {
   id: string;
@@ -152,7 +149,7 @@ export async function runListingAgent(): Promise<ListingAgentResult[]> {
         .single();
 
       if (insertError) {
-        logger.error({ leaseId: lease.id, err: insertError }, 'DB insert failed for lease');
+        console.error(`[listing-agent] DB insert failed for lease ${lease.id}:`, insertError);
       }
 
       results.push({
@@ -164,7 +161,7 @@ export async function runListingAgent(): Promise<ListingAgentResult[]> {
         providerResults,
       });
     } catch (err) {
-      logger.error({ leaseId: lease.id, err }, 'Error processing lease');
+      console.error(`[listing-agent] Error processing lease ${lease.id}:`, err);
       results.push({
         leaseId: lease.id,
         propertyAddress: lease.properties?.address ?? 'unknown',

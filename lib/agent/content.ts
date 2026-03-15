@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { withAITracking } from '@/lib/ai-metrics';
 import type { AIContent } from '@/lib/types';
 export type { AIContent };
 
@@ -37,15 +36,11 @@ Generate:
 Respond with ONLY valid JSON:
 {"title": "string", "description": "string", "highlights": ["string", ...]}`;
 
-  const response = await withAITracking(
-    { service: 'listing-agent', endpoint: 'content-generation' },
-    () =>
-      client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-  );
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1000,
+    messages: [{ role: 'user', content: prompt }],
+  });
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
   const json = text.match(/\{[\s\S]*\}/)?.[0];

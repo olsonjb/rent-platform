@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processQueuedMaintenanceReviews } from "@/lib/maintenance-review";
-import { createLogger, withCorrelationId } from "@/lib/logger";
-import { getCorrelationId, setCorrelationIdHeader } from "@/lib/correlation";
-
-const baseLogger = createLogger("maintenance-reviews-process");
 
 const getWorkerSecrets = (): string[] => {
   const secrets = [
@@ -41,27 +37,16 @@ const isAuthorized = (request: NextRequest): boolean => {
 };
 
 async function handleProcessRequest(request: NextRequest) {
-  const correlationId = getCorrelationId(request);
-  const logger = withCorrelationId(baseLogger, correlationId);
-
   try {
     if (!isAuthorized(request)) {
-      return setCorrelationIdHeader(
-        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-        correlationId,
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const result = await processQueuedMaintenanceReviews(parseBatchSize(request));
-    logger.info({ result }, "Maintenance review processing complete");
-    return setCorrelationIdHeader(NextResponse.json(result), correlationId);
+    return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown processing error";
-    logger.error({ err: error }, "Maintenance review processing failed");
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: message }, { status: 500 }),
-      correlationId,
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { withAITracking } from '@/lib/ai-metrics';
 import type { AIDecision } from '@/lib/types';
 export type { AIDecision };
 
@@ -53,15 +52,11 @@ Decide:
 Respond with ONLY valid JSON:
 {"should_list": boolean, "reasoning": "string", "suggested_rent": number, "urgency": "high"|"medium"|"low"}`;
 
-  const response = await withAITracking(
-    { service: 'listing-agent', endpoint: 'listing-decision' },
-    () =>
-      client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 500,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-  );
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 500,
+    messages: [{ role: 'user', content: prompt }],
+  });
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
   const json = text.match(/\{[\s\S]*\}/)?.[0];

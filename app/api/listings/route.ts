@@ -1,9 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getCorrelationId, setCorrelationIdHeader } from '@/lib/correlation';
 
-export async function GET(request: NextRequest) {
-  const correlationId = getCorrelationId(request);
+export async function GET() {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -12,11 +10,8 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false });
 
   if (error) {
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: error.message }, { status: 500 }),
-      correlationId,
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return setCorrelationIdHeader(NextResponse.json(data), correlationId);
+  return NextResponse.json(data);
 }

@@ -1,7 +1,3 @@
-import { createLogger } from "@/lib/logger";
-
-const logger = createLogger("application-screening-worker");
-
 const resolveAppOrigin = (): string | null => {
   const configured = process.env.NEXT_PUBLIC_SITE_URL;
   if (typeof configured === "string" && configured.length > 0) return configured;
@@ -40,6 +36,6 @@ async function triggerApplicationScreeningProcessing(): Promise<void> {
 
 export function triggerApplicationScreeningProcessingInBackground(): void {
   void triggerApplicationScreeningProcessing().catch((error: unknown) => {
-    logger.error({ err: error }, "Failed to trigger application screening processing");
+    console.error("Failed to trigger application screening processing", error);
   });
 }

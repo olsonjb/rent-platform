@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe, getStripeMode } from '@/lib/stripe';
 import { createServiceClient } from '@/lib/supabase/service';
-import { createLogger, withCorrelationId } from '@/lib/logger';
-import { getCorrelationId, setCorrelationIdHeader } from '@/lib/correlation';
-
-const baseLogger = createLogger('stripe-webhook');
 
 const WEBHOOK_SECRETS = {
   demo: process.env.STRIPE_TEST_WEBHOOK_SECRET,
@@ -12,30 +8,21 @@ const WEBHOOK_SECRETS = {
 } as const;
 
 export async function POST(req: NextRequest) {
-  const correlationId = getCorrelationId(req);
-  const logger = withCorrelationId(baseLogger, correlationId);
-
   const stripe = getStripe();
   const mode = getStripeMode();
 
   const sig = req.headers.get('stripe-signature');
 
   if (!sig) {
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: 'Bad request' }, { status: 400 }),
-      correlationId,
-    );
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 
   const webhookSecret = WEBHOOK_SECRETS[mode];
   if (!webhookSecret) {
     const varName =
       mode === 'demo' ? 'STRIPE_TEST_WEBHOOK_SECRET' : 'STRIPE_LIVE_WEBHOOK_SECRET';
-    logger.error({ varName }, 'Stripe webhook secret is not configured');
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 }),
-      correlationId,
-    );
+    console.error(`${varName} is not configured`);
+    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
   }
 
   let event: ReturnType<typeof stripe.webhooks.constructEvent>;
@@ -44,14 +31,11 @@ export async function POST(req: NextRequest) {
     const body = Buffer.from(await req.bytes());
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err) {
-    logger.error(
-      { err: err instanceof Error ? err.message : err },
-      'Webhook signature verification failed',
+    console.error(
+      'Webhook signature verification failed:',
+      err instanceof Error ? err.message : err,
     );
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: 'Webhook verification failed' }, { status: 400 }),
-      correlationId,
-    );
+    return NextResponse.json({ error: 'Webhook verification failed' }, { status: 400 });
   }
 
   const supabase = createServiceClient();
@@ -66,11 +50,8 @@ export async function POST(req: NextRequest) {
         typeof session.setup_intent === 'string' ? session.setup_intent : null;
 
       if (!userId) {
-        logger.error({ sessionId: session.id }, 'No user ID found in setup session');
-        return setCorrelationIdHeader(
-          NextResponse.json({ error: 'Missing user reference' }, { status: 400 }),
-          correlationId,
-        );
+        console.error('No user ID found in setup session');
+        return NextResponse.json({ error: 'Missing user reference' }, { status: 400 });
       }
 
       let paymentMethodId: string | null = null;
@@ -90,17 +71,11 @@ export async function POST(req: NextRequest) {
         .eq('id', userId);
 
       if (error) {
-        logger.error({ err: error }, 'Failed to update profile payment status');
-        return setCorrelationIdHeader(
-          NextResponse.json({ error: 'Database update failed' }, { status: 500 }),
-          correlationId,
-        );
+        console.error('Failed to update profile payment status:', error);
+        return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
       }
 
-      return setCorrelationIdHeader(
-        NextResponse.json({ received: true }),
-        correlationId,
-      );
+      return NextResponse.json({ received: true });
     }
 
     // Handle one-time payment sessions
@@ -113,10 +88,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (existing?.status === 'succeeded') {
-      return setCorrelationIdHeader(
-        NextResponse.json({ received: true }),
-        correlationId,
-      );
+      return NextResponse.json({ received: true });
     }
 
     const { error } = await supabase
@@ -130,16 +102,10 @@ export async function POST(req: NextRequest) {
       .eq('stripe_checkout_id', session.id);
 
     if (error) {
-      logger.error({ err: error }, 'Failed to update payment record');
-      return setCorrelationIdHeader(
-        NextResponse.json({ error: 'Database update failed' }, { status: 500 }),
-        correlationId,
-      );
+      console.error('Failed to update payment record:', error);
+      return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
     }
   }
 
-  return setCorrelationIdHeader(
-    NextResponse.json({ received: true }),
-    correlationId,
-  );
+  return NextResponse.json({ received: true });
 }

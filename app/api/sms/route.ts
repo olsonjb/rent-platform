@@ -2,14 +2,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
-import { withAITracking } from "@/lib/ai-metrics";
-import { createLogger, withCorrelationId } from "@/lib/logger";
-import { getCorrelationId } from "@/lib/correlation";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
-
-const baseLogger = createLogger("sms-api");
 
 const anthropic = new Anthropic();
 
@@ -52,21 +47,16 @@ function parseMaintenanceRequests(
   return { displayText, maintenanceRequests: requests };
 }
 
-function twimlReply(message: string, correlationId?: string): NextResponse {
+function twimlReply(message: string): NextResponse {
   const MessagingResponse = twilio.twiml.MessagingResponse;
   const twiml = new MessagingResponse();
   twiml.message(message);
-  const headers: Record<string, string> = { "Content-Type": "text/xml" };
-  if (correlationId) {
-    headers["x-correlation-id"] = correlationId;
-  }
-  return new NextResponse(twiml.toString(), { headers });
+  return new NextResponse(twiml.toString(), {
+    headers: { "Content-Type": "text/xml" },
+  });
 }
 
 export async function POST(request: NextRequest) {
-  const correlationId = getCorrelationId(request);
-  const logger = withCorrelationId(baseLogger, correlationId);
-
   const formData = await request.formData();
   const from = formData.get("From") as string;
   const body = formData.get("Body") as string;
@@ -132,16 +122,12 @@ export async function POST(request: NextRequest) {
     managerPhone: property.manager_phone,
   });
 
-  const response = await withAITracking(
-    { service: "sms", endpoint: "/api/sms", userId: tenant.id, correlationId },
-    () =>
-      anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 320, // keep SMS replies concise
-        system: systemPrompt,
-        messages,
-      }),
-  );
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 320, // keep SMS replies concise
+    system: systemPrompt,
+    messages,
+  });
 
   const rawReply =
     response.content[0].type === "text" ? response.content[0].text : "";
@@ -174,7 +160,7 @@ export async function POST(request: NextRequest) {
         urgency: mr.urgency,
       });
       await sendSms(property.manager_phone, landlordMsg).catch((err) =>
-        logger.error({ err }, "Failed to SMS landlord")
+        console.error("Failed to SMS landlord:", err)
       );
     }
   }
@@ -187,5 +173,5 @@ export async function POST(request: NextRequest) {
     channel: "sms",
   });
 
-  return twimlReply(displayText, correlationId);
+  return twimlReply(displayText);
 }

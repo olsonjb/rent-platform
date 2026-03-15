@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { withAITracking } from '@/lib/ai-metrics';
 import type { ScreeningDecision } from '@/lib/types';
 
 interface ScreeningInput {
@@ -78,16 +77,12 @@ PROPERTY:
 Respond with ONLY valid JSON:
 {"approved": boolean, "reasoning": "string explaining the decision", "risk_score": number 0-100 where 0 is no risk, "income_ratio": number, "flags": ["array", "of", "risk", "flags"], "confidence": number 0-1, "social_media_notes": "string or null"}`;
 
-  const response = await withAITracking(
-    { service: 'screening-agent', endpoint: 'application-screening' },
-    () =>
-      client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 800,
-        temperature: 0.2,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-  );
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 800,
+    temperature: 0.2,
+    messages: [{ role: 'user', content: prompt }],
+  });
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
   const json = text.match(/\{[\s\S]*\}/)?.[0];

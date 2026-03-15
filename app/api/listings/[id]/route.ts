@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getCorrelationId, setCorrelationIdHeader } from '@/lib/correlation';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const correlationId = getCorrelationId(request);
   const { id } = await params;
   const supabase = await createClient();
 
@@ -18,30 +16,23 @@ export async function GET(
 
   if (error) {
     const status = error.code === 'PGRST116' ? 404 : 500;
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: error.message }, { status }),
-      correlationId,
-    );
+    return NextResponse.json({ error: error.message }, { status });
   }
 
-  return setCorrelationIdHeader(NextResponse.json(data), correlationId);
+  return NextResponse.json(data);
 }
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const correlationId = getCorrelationId(request);
   const { id } = await params;
   const supabase = await createClient();
   let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }),
-      correlationId,
-    );
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
   const allowed = ['status', 'title', 'description', 'highlights', 'suggested_rent'];
@@ -53,10 +44,7 @@ export async function PATCH(
   }
 
   if (Object.keys(updates).length === 0) {
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: 'No valid fields to update' }, { status: 400 }),
-      correlationId,
-    );
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
   }
 
   const { data, error } = await supabase
@@ -67,11 +55,8 @@ export async function PATCH(
     .single();
 
   if (error) {
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: error.message }, { status: 500 }),
-      correlationId,
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return setCorrelationIdHeader(NextResponse.json(data), correlationId);
+  return NextResponse.json(data);
 }

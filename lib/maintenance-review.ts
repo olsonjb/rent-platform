@@ -1,5 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { withAITracking } from "@/lib/ai-metrics";
 import { createServiceClient } from "@/lib/supabase/service";
 
 type JobStatus = "queued" | "processing" | "completed" | "failed";
@@ -202,21 +201,17 @@ async function fetchMaintenanceRequestContext(
 async function estimateCost(context: MaintenanceRequestContext): Promise<CostEstimate> {
   const anthropic = new Anthropic({ apiKey: getRequiredEnv("ANTHROPIC_API_KEY") });
 
-  const response = await withAITracking(
-    { service: "maintenance-review", endpoint: "cost-estimate" },
-    () =>
-      anthropic.messages.create({
-        model: REVIEW_MODEL,
-        max_tokens: 500,
-        temperature: 0.2,
-        messages: [
-          {
-            role: "user",
-            content: buildEstimatePrompt(context),
-          },
-        ],
-      }),
-  );
+  const response = await anthropic.messages.create({
+    model: REVIEW_MODEL,
+    max_tokens: 500,
+    temperature: 0.2,
+    messages: [
+      {
+        role: "user",
+        content: buildEstimatePrompt(context),
+      },
+    ],
+  });
 
   const textBlock = response.content.find(
     (contentBlock: Anthropic.ContentBlock) => contentBlock.type === "text",
