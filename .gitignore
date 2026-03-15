@@ -43,3 +43,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude agent worktrees & local context
+.claude/worktrees/
+HANDOFF.md
+SHARED_CONTEXT.md
