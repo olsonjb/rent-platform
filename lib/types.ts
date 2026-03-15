@@ -130,3 +130,56 @@ export interface LeaseWithRelations extends Lease {
     email: string;
   };
 }
+
+// T15: Document Intelligence
+
+export type ExtractionStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export interface ExtractedLeaseData {
+  tenant_names: string[];
+  address: {
+    street: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+  };
+  monthly_rent: number | null;
+  lease_start_date: string | null;
+  lease_end_date: string | null;
+  security_deposit: number | null;
+  pet_policy: string | null;
+  parking_policy: string | null;
+  quiet_hours: string | null;
+  late_fee_terms: string | null;
+  early_termination_terms: string | null;
+  contact_info: {
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+  };
+}
+
+export interface LeaseDocument {
+  id: string;
+  landlord_id: string;
+  property_id: string | null;
+  file_url: string;
+  file_name: string;
+  extraction_status: ExtractionStatus;
+  extracted_data: ExtractedLeaseData | null;
+  created_at: string;
+}
+
+export type ExtractionJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export interface DocumentExtractionJob {
+  id: string;
+  document_id: string;
+  status: ExtractionJobStatus;
+  attempts: number;
+  max_attempts: number;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+  claimed_at: string | null;
+}
