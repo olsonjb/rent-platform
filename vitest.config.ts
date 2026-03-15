@@ -22,6 +22,8 @@ export default defineConfig({
         "lib/maintenance-requests.ts",
         "lib/auth/**",
         "lib/chat/**",
+        "lib/validation.ts",
+        "lib/api-response.ts",
       ],
       thresholds: {
         lines: 80,
