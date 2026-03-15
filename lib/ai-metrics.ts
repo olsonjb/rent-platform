@@ -35,6 +35,8 @@ interface TrackAIUsageParams {
   endpoint?: string;
   correlationId?: string;
   userId?: string;
+  promptName?: string;
+  promptVersion?: string;
 }
 
 /** Fire-and-forget write to the ai_usage_log table. Never throws. */
@@ -54,6 +56,8 @@ export async function trackAIUsage(params: TrackAIUsageParams): Promise<void> {
       endpoint: params.endpoint ?? null,
       correlation_id: params.correlationId ?? null,
       user_id: params.userId ?? null,
+      prompt_name: params.promptName ?? null,
+      prompt_version: params.promptVersion ?? null,
     });
 
     if (error) {
