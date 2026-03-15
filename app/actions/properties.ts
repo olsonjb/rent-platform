@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { createServiceClient } from '@/lib/supabase/service';
+import { validateCreateProperty } from '@/lib/validation';
 import type { Property } from '@/lib/types';
 
 export async function getProperties(): Promise<Property[]> {
@@ -25,6 +26,12 @@ export async function createProperty(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
+
+  const validation = validateCreateProperty(formData);
+  if (!validation.valid) {
+    const firstError = Object.values(validation.errors)[0];
+    throw new Error(firstError);
+  }
 
   const { error } = await supabase.from('properties').insert({
     landlord_id: user.id,

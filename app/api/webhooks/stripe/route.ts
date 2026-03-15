@@ -1,14 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getStripe, getStripeMode } from '@/lib/stripe';
 import { createServiceClient } from '@/lib/supabase/service';
+import { apiSuccess, apiError } from '@/lib/api-response';
 import { createLogger, withCorrelationId } from '@/lib/logger';
-import { getCorrelationId, setCorrelationIdHeader } from '@/lib/correlation';
-import {
-  rateLimit,
-  RATE_LIMIT_CONFIGS,
-  shouldBypass,
-  rateLimitHeaders,
-} from '@/lib/rate-limit';
+import { getCorrelationId } from '@/lib/correlation';
 
 const baseLogger = createLogger('stripe-webhook');
 
@@ -21,44 +16,13 @@ export async function POST(req: NextRequest) {
   const correlationId = getCorrelationId(req);
   const logger = withCorrelationId(baseLogger, correlationId);
 
-  // Rate limiting: 30 requests per minute per IP
-  if (!shouldBypass(req.headers)) {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      ?? req.headers.get('x-real-ip')
-      ?? 'unknown';
-    const rlResult = await rateLimit(
-      `stripe:${ip}`,
-      RATE_LIMIT_CONFIGS.stripe,
-    );
-
-    if (!rlResult.allowed) {
-      const rlHeaders = rateLimitHeaders(rlResult, RATE_LIMIT_CONFIGS.stripe);
-      return setCorrelationIdHeader(
-        new NextResponse(
-          JSON.stringify({ error: 'Rate limit exceeded' }),
-          {
-            status: 429,
-            headers: {
-              'Content-Type': 'application/json',
-              ...rlHeaders,
-            },
-          },
-        ),
-        correlationId,
-      );
-    }
-  }
-
   const stripe = getStripe();
   const mode = getStripeMode();
 
   const sig = req.headers.get('stripe-signature');
 
   if (!sig) {
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: 'Bad request' }, { status: 400 }),
-      correlationId,
-    );
+    return apiError('Bad request', 400, correlationId, 'MISSING_SIGNATURE');
   }
 
   const webhookSecret = WEBHOOK_SECRETS[mode];
@@ -66,10 +30,7 @@ export async function POST(req: NextRequest) {
     const varName =
       mode === 'demo' ? 'STRIPE_TEST_WEBHOOK_SECRET' : 'STRIPE_LIVE_WEBHOOK_SECRET';
     logger.error({ varName }, 'Stripe webhook secret is not configured');
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 }),
-      correlationId,
-    );
+    return apiError('Server misconfiguration', 500, correlationId, 'MISSING_CONFIG');
   }
 
   let event: ReturnType<typeof stripe.webhooks.constructEvent>;
@@ -82,10 +43,7 @@ export async function POST(req: NextRequest) {
       { err: err instanceof Error ? err.message : err },
       'Webhook signature verification failed',
     );
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: 'Webhook verification failed' }, { status: 400 }),
-      correlationId,
-    );
+    return apiError('Webhook verification failed', 400, correlationId, 'INVALID_SIGNATURE');
   }
 
   const supabase = createServiceClient();
@@ -101,10 +59,7 @@ export async function POST(req: NextRequest) {
 
       if (!userId) {
         logger.error({ sessionId: session.id }, 'No user ID found in setup session');
-        return setCorrelationIdHeader(
-          NextResponse.json({ error: 'Missing user reference' }, { status: 400 }),
-          correlationId,
-        );
+        return apiError('Missing user reference', 400, correlationId, 'MISSING_USER_REF');
       }
 
       let paymentMethodId: string | null = null;
@@ -125,16 +80,10 @@ export async function POST(req: NextRequest) {
 
       if (error) {
         logger.error({ err: error }, 'Failed to update profile payment status');
-        return setCorrelationIdHeader(
-          NextResponse.json({ error: 'Database update failed' }, { status: 500 }),
-          correlationId,
-        );
+        return apiError('Database update failed', 500, correlationId, 'DB_ERROR');
       }
 
-      return setCorrelationIdHeader(
-        NextResponse.json({ received: true }),
-        correlationId,
-      );
+      return apiSuccess({ received: true }, correlationId);
     }
 
     // Handle one-time payment sessions
@@ -147,10 +96,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (existing?.status === 'succeeded') {
-      return setCorrelationIdHeader(
-        NextResponse.json({ received: true }),
-        correlationId,
-      );
+      return apiSuccess({ received: true }, correlationId);
     }
 
     const { error } = await supabase
@@ -165,15 +111,9 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       logger.error({ err: error }, 'Failed to update payment record');
-      return setCorrelationIdHeader(
-        NextResponse.json({ error: 'Database update failed' }, { status: 500 }),
-        correlationId,
-      );
+      return apiError('Database update failed', 500, correlationId, 'DB_ERROR');
     }
   }
 
-  return setCorrelationIdHeader(
-    NextResponse.json({ received: true }),
-    correlationId,
-  );
+  return apiSuccess({ received: true }, correlationId);
 }

@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { apiSuccess, apiError } from "@/lib/api-response";
 import { createLogger, withCorrelationId } from "@/lib/logger";
-import { getCorrelationId, setCorrelationIdHeader } from "@/lib/correlation";
+import { getCorrelationId } from "@/lib/correlation";
 
 const baseLogger = createLogger("health");
 
@@ -25,21 +26,18 @@ export async function GET(request: NextRequest) {
   }
 
   const allHealthy = Object.values(checks).every((v) => v === "ok");
-  const status = allHealthy ? 200 : 503;
 
   if (!allHealthy) {
     logger.warn({ checks }, "Health check degraded");
+    return apiError("degraded", 503, correlationId, "HEALTH_DEGRADED");
   }
 
-  return setCorrelationIdHeader(
-    NextResponse.json(
-      {
-        status: allHealthy ? "ok" : "degraded",
-        timestamp: new Date().toISOString(),
-        checks,
-      },
-      { status },
-    ),
+  return apiSuccess(
+    {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      checks,
+    },
     correlationId,
   );
 }

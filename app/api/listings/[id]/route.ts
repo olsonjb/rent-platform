@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getCorrelationId, setCorrelationIdHeader } from '@/lib/correlation';
+import { apiSuccess, apiError } from '@/lib/api-response';
+import { getCorrelationId } from '@/lib/correlation';
 
 export async function GET(
   request: NextRequest,
@@ -18,13 +19,10 @@ export async function GET(
 
   if (error) {
     const status = error.code === 'PGRST116' ? 404 : 500;
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: error.message }, { status }),
-      correlationId,
-    );
+    return apiError(error.message, status, correlationId, error.code);
   }
 
-  return setCorrelationIdHeader(NextResponse.json(data), correlationId);
+  return apiSuccess(data, correlationId);
 }
 
 export async function PATCH(
@@ -38,10 +36,7 @@ export async function PATCH(
   try {
     body = await request.json();
   } catch {
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }),
-      correlationId,
-    );
+    return apiError('Invalid JSON body', 400, correlationId, 'INVALID_JSON');
   }
 
   const allowed = ['status', 'title', 'description', 'highlights', 'suggested_rent'];
@@ -53,10 +48,7 @@ export async function PATCH(
   }
 
   if (Object.keys(updates).length === 0) {
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: 'No valid fields to update' }, { status: 400 }),
-      correlationId,
-    );
+    return apiError('No valid fields to update', 400, correlationId, 'NO_FIELDS');
   }
 
   const { data, error } = await supabase
@@ -67,11 +59,8 @@ export async function PATCH(
     .single();
 
   if (error) {
-    return setCorrelationIdHeader(
-      NextResponse.json({ error: error.message }, { status: 500 }),
-      correlationId,
-    );
+    return apiError(error.message, 500, correlationId, 'DB_ERROR');
   }
 
-  return setCorrelationIdHeader(NextResponse.json(data), correlationId);
+  return apiSuccess(data, correlationId);
 }
