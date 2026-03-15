@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { withAITracking } from '@/lib/ai-metrics';
+import { getModelConfig } from '@/lib/ai/models';
+import { buildScreeningPrompt } from '@/lib/ai/prompts/screening';
 import type { ScreeningDecision } from '@/lib/types';
 
 interface ScreeningInput {
@@ -21,15 +23,6 @@ interface ScreeningInput {
   };
 }
 
-const CREDIT_LABELS: Record<string, string> = {
-  below_580: 'Below 580 (Poor)',
-  '580_619': '580-619 (Fair)',
-  '620_659': '620-659 (Good)',
-  '660_699': '660-699 (Very Good)',
-  '700_749': '700-749 (Excellent)',
-  '750_plus': '750+ (Exceptional)',
-};
-
 const FALLBACK_DECISION: ScreeningDecision = {
   approved: false,
   reasoning: 'Failed to parse AI screening response',
@@ -47,44 +40,31 @@ export async function screenApplication(input: ScreeningInput): Promise<Screenin
     ? input.application.monthly_income / input.property.monthly_rent
     : 0;
 
-  const prompt = `You are a tenant screening AI for residential rentals. Evaluate this rental application and make an approval/denial recommendation.
+  const prompt = buildScreeningPrompt({
+    fullName: input.application.full_name,
+    creditScoreRange: input.application.credit_score_range,
+    monthlyIncome: input.application.monthly_income,
+    employerName: input.application.employer_name,
+    employmentDurationMonths: input.application.employment_duration_months,
+    employmentType: input.application.employment_type,
+    yearsRenting: input.application.years_renting,
+    previousEvictions: input.application.previous_evictions,
+    references: input.application.references,
+    socialMediaLinks: input.application.social_media_links,
+    propertyAddress: input.property.address,
+    monthlyRent: input.property.monthly_rent,
+    incomeRatio,
+  });
 
-SCREENING CRITERIA:
-- Income >= 3x rent required (below 2.5x = auto-deny)
-- Credit: below_580 = high risk, 580_619 = moderate risk, 620+ = acceptable
-- Previous evictions = serious red flag
-- Less than 1 year renting = minor flag
-- Employment < 6 months = minor flag; self-employed needs 3.5x income
-- 0 references = minor flag
-- Social media links: if provided, analyze for red flags (property damage, noise complaints, etc.)
-
-APPLICATION:
-- Applicant: ${input.application.full_name}
-- Credit Score Range: ${CREDIT_LABELS[input.application.credit_score_range] ?? input.application.credit_score_range}
-- Monthly Income: $${input.application.monthly_income.toFixed(2)}
-- Employer: ${input.application.employer_name ?? 'Not provided'}
-- Employment Duration: ${input.application.employment_duration_months != null ? `${input.application.employment_duration_months} months` : 'Not provided'}
-- Employment Type: ${input.application.employment_type ?? 'Not provided'}
-- Years Renting: ${input.application.years_renting}
-- Previous Evictions: ${input.application.previous_evictions ? 'Yes' : 'No'}
-- References: ${input.application.references.length > 0 ? input.application.references.map(r => `${r.name} (${r.relationship})`).join(', ') : 'None provided'}
-- Social Media Links: ${input.application.social_media_links.length > 0 ? input.application.social_media_links.join(', ') : 'None provided'}
-
-PROPERTY:
-- Address: ${input.property.address}
-- Monthly Rent: $${input.property.monthly_rent.toFixed(2)}
-- Income-to-Rent Ratio: ${incomeRatio.toFixed(2)}x
-
-Respond with ONLY valid JSON:
-{"approved": boolean, "reasoning": "string explaining the decision", "risk_score": number 0-100 where 0 is no risk, "income_ratio": number, "flags": ["array", "of", "risk", "flags"], "confidence": number 0-1, "social_media_notes": "string or null"}`;
+  const modelConfig = getModelConfig('screening');
 
   const response = await withAITracking(
     { service: 'screening-agent', endpoint: 'application-screening' },
     () =>
       client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 800,
-        temperature: 0.2,
+        model: modelConfig.model,
+        max_tokens: modelConfig.maxTokens,
+        temperature: modelConfig.temperature,
         messages: [{ role: 'user', content: prompt }],
       }),
   );
