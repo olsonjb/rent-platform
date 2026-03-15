@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "eyJ-placeholder-key"
+  SUPABASE_SERVICE_ROLE_KEY: "sbp_placeholder"
+  ANTHROPIC_API_KEY: "sk-ant-placeholder"
+  STRIPE_MODE: "demo"
+  STRIPE_TEST_SECRET_KEY: "sk_test_dummy"
+  NEXT_PUBLIC_STRIPE_TEST_PUBLISHABLE_KEY: "pk_test_dummy"
+  CRON_SECRET: "test-cron-secret"
+  TWILIO_ACCOUNT_SID: "AC_placeholder"
+  TWILIO_AUTH_TOKEN: "placeholder_auth_token"
+  TWILIO_PHONE_NUMBER: "+10000000000"
+  GOOGLE_PLACES_API_KEY: "placeholder"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  # test:
+  #   name: Test
+  #   runs-on: ubuntu-latest
+  #   needs: [lint, typecheck]
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #         cache: npm
+  #     - run: npm ci
+  #     - run: npm test
+  #
+  # NOTE: T02 (test suite) will uncomment and configure this job
+  # once vitest is set up and tests are written.
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+
+  validate-migrations:
+    name: Validate Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SQL migration files
+        run: |
+          MIGRATIONS_DIR="supabase/migrations"
+          if [ ! -d "$MIGRATIONS_DIR" ]; then
+            echo "No migrations directory found — skipping"
+            exit 0
+          fi
+
+          ERRORS=0
+          for f in "$MIGRATIONS_DIR"/*.sql; do
+            [ -e "$f" ] || continue
+
+            if [ ! -s "$f" ]; then
+              echo "ERROR: Empty migration file: $f"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            if file "$f" | grep -qv "text"; then
+              echo "ERROR: Non-text migration file: $f"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            echo "OK: $f ($(wc -l < "$f") lines)"
+          done
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "Found $ERRORS invalid migration file(s)"
+            exit 1
+          fi
+
+          echo "All migration files valid"
