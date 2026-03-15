@@ -1,11 +1,12 @@
-import { activeProviders } from '@/lib/providers';
+import { getActiveProviders } from '@/lib/providers';
 import type { PropertyListing, SubmitResult } from '@/lib/providers';
 
 export async function submitToProviders(listing: PropertyListing): Promise<SubmitResult[]> {
+  const providers = getActiveProviders();
   const results: SubmitResult[] = [];
 
-  for (let i = 0; i < activeProviders.length; i++) {
-    const provider = activeProviders[i];
+  for (let i = 0; i < providers.length; i++) {
+    const provider = providers[i];
     try {
       const result = await provider.submit(listing);
       results.push(result);

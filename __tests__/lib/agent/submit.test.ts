@@ -7,7 +7,7 @@ const { submitA, submitB } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/providers", () => ({
-  activeProviders: [
+  getActiveProviders: () => [
     { name: "ProviderA", submit: submitA },
     { name: "ProviderB", submit: submitB },
   ],
