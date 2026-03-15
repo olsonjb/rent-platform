@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { withAITracking } from "@/lib/ai-metrics";
+import { getModelConfig } from "@/lib/ai/models";
+import { buildMaintenanceEstimatePrompt } from "@/lib/ai/prompts/maintenance-estimate";
 import { createServiceClient } from "@/lib/supabase/service";
 
 type JobStatus = "queued" | "processing" | "completed" | "failed";
@@ -44,7 +46,6 @@ export type MaintenanceRequestContext = {
   property_address: string;
 };
 
-const REVIEW_MODEL = "claude-sonnet-4-20250514";
 const DEFAULT_BATCH_SIZE = 10;
 const DEFAULT_MAX_RETRIES = 3;
 const GOOGLE_PLACES_TEXT_SEARCH_URL =
@@ -129,25 +130,15 @@ export const parseEstimateJson = (raw: string): CostEstimate => {
 };
 
 export const buildEstimatePrompt = (context: MaintenanceRequestContext): string => {
-  return [
-    "Estimate this maintenance request for a US residential property.",
-    "Return JSON only with keys:",
-    "trade (string)",
-    "severity (one of: low, medium, high, critical)",
-    "estimated_cost_min (number, USD)",
-    "estimated_cost_max (number, USD)",
-    "confidence (number 0-1)",
-    "summary (string, <= 220 chars, plain language)",
-    "Do not include markdown or additional keys.",
-    "",
-    `Issue title: ${context.issue}`,
-    `Issue details: ${context.details ?? "Not provided"}`,
-    `Location in unit: ${context.location ?? "Not provided"}`,
-    `Urgency: ${context.urgency}`,
-    `Unit: ${context.unit}`,
-    `Property: ${context.property_name}`,
-    `Address: ${context.property_address}`,
-  ].join("\n");
+  return buildMaintenanceEstimatePrompt({
+    issue: context.issue,
+    details: context.details,
+    location: context.location,
+    urgency: context.urgency,
+    unit: context.unit,
+    propertyName: context.property_name,
+    propertyAddress: context.property_address,
+  });
 };
 
 export const buildPlacesQuery = (context: MaintenanceRequestContext, trade: string): string => {
@@ -201,14 +192,15 @@ async function fetchMaintenanceRequestContext(
 
 async function estimateCost(context: MaintenanceRequestContext): Promise<CostEstimate> {
   const anthropic = new Anthropic({ apiKey: getRequiredEnv("ANTHROPIC_API_KEY") });
+  const modelConfig = getModelConfig("maintenance");
 
   const response = await withAITracking(
     { service: "maintenance-review", endpoint: "cost-estimate" },
     () =>
       anthropic.messages.create({
-        model: REVIEW_MODEL,
-        max_tokens: 500,
-        temperature: 0.2,
+        model: modelConfig.model,
+        max_tokens: modelConfig.maxTokens,
+        temperature: modelConfig.temperature,
         messages: [
           {
             role: "user",
@@ -323,7 +315,7 @@ async function saveReview(
       confidence: estimate.confidence,
       summary: estimate.summary,
       vendors,
-      model: REVIEW_MODEL,
+      model: getModelConfig("maintenance").model,
       reviewed_at: new Date().toISOString(),
     },
     { onConflict: "maintenance_request_id" },

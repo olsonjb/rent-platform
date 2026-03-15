@@ -1,5 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { withAITracking } from '@/lib/ai-metrics';
+import { getModelConfig } from '@/lib/ai/models';
+import { extractJson } from '@/lib/ai/extractors';
+import { buildScreeningPrompt } from '@/lib/ai/prompts/screening';
 import type { ScreeningDecision } from '@/lib/types';
 
 interface ScreeningInput {
@@ -21,15 +24,6 @@ interface ScreeningInput {
   };
 }
 
-const CREDIT_LABELS: Record<string, string> = {
-  below_580: 'Below 580 (Poor)',
-  '580_619': '580-619 (Fair)',
-  '620_659': '620-659 (Good)',
-  '660_699': '660-699 (Very Good)',
-  '700_749': '700-749 (Excellent)',
-  '750_plus': '750+ (Exceptional)',
-};
-
 const FALLBACK_DECISION: ScreeningDecision = {
   approved: false,
   reasoning: 'Failed to parse AI screening response',
@@ -47,65 +41,45 @@ export async function screenApplication(input: ScreeningInput): Promise<Screenin
     ? input.application.monthly_income / input.property.monthly_rent
     : 0;
 
-  const prompt = `You are a tenant screening AI for residential rentals. Evaluate this rental application and provide an advisory recommendation. Your recommendation is NOT a final decision — a human landlord must review and approve or deny every application.
+  const prompt = buildScreeningPrompt({
+    fullName: input.application.full_name,
+    creditScoreRange: input.application.credit_score_range,
+    monthlyIncome: input.application.monthly_income,
+    employerName: input.application.employer_name,
+    employmentDurationMonths: input.application.employment_duration_months,
+    employmentType: input.application.employment_type,
+    yearsRenting: input.application.years_renting,
+    previousEvictions: input.application.previous_evictions,
+    references: input.application.references,
+    socialMediaLinks: input.application.social_media_links,
+    propertyAddress: input.property.address,
+    monthlyRent: input.property.monthly_rent,
+    incomeRatio,
+  });
 
-FAIR HOUSING COMPLIANCE:
-- Decisions must be based ONLY on: financial qualification, rental history, and verifiable references.
-- Do NOT infer or consider race, religion, national origin, sex, familial status, or disability from any input data.
-- Do NOT consider: name-based ethnicity inference, neighborhood demographics, familial status, or any protected characteristic.
-- Do NOT analyze or reference social media content.
-
-SCREENING CRITERIA:
-- Income >= 3x rent required (below 2.5x = auto-deny)
-- Credit: below_580 = high risk, 580_619 = moderate risk, 620+ = acceptable
-- Previous evictions = serious red flag
-- Less than 1 year renting = minor flag
-- Employment < 6 months = minor flag; self-employed needs 3.5x income
-- 0 references = minor flag
-
-APPLICATION:
-- Credit Score Range: ${CREDIT_LABELS[input.application.credit_score_range] ?? input.application.credit_score_range}
-- Monthly Income: $${input.application.monthly_income.toFixed(2)}
-- Employer: ${input.application.employer_name ?? 'Not provided'}
-- Employment Duration: ${input.application.employment_duration_months != null ? `${input.application.employment_duration_months} months` : 'Not provided'}
-- Employment Type: ${input.application.employment_type ?? 'Not provided'}
-- Years Renting: ${input.application.years_renting}
-- Previous Evictions: ${input.application.previous_evictions ? 'Yes' : 'No'}
-- References: ${input.application.references.length > 0 ? input.application.references.map(r => `${r.name} (${r.relationship})`).join(', ') : 'None provided'}
-
-PROPERTY:
-- Monthly Rent: $${input.property.monthly_rent.toFixed(2)}
-- Income-to-Rent Ratio: ${incomeRatio.toFixed(2)}x
-
-Respond with ONLY valid JSON:
-{"approved": boolean, "reasoning": "string explaining the decision", "risk_score": number 0-100 where 0 is no risk, "income_ratio": number, "flags": ["array", "of", "risk", "flags"], "confidence": number 0-1, "social_media_notes": null}`;
+  const modelConfig = getModelConfig('screening');
 
   const response = await withAITracking(
     { service: 'screening-agent', endpoint: 'application-screening' },
     () =>
       client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 800,
-        temperature: 0.2,
+        model: modelConfig.model,
+        max_tokens: modelConfig.maxTokens,
+        temperature: modelConfig.temperature,
         messages: [{ role: 'user', content: prompt }],
       }),
   );
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
-  const json = text.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) {
+  const parsed = extractJson<ScreeningDecision | null>(text, null);
+  if (!parsed) {
     return FALLBACK_DECISION;
   }
-  try {
-    const parsed = JSON.parse(json) as ScreeningDecision;
-    return {
-      ...parsed,
-      income_ratio: incomeRatio,
-      confidence: Math.max(0, Math.min(1, parsed.confidence)),
-      risk_score: Math.max(0, Math.min(100, parsed.risk_score)),
-      social_media_notes: null, // Fair Housing: never include social media analysis
-    };
-  } catch {
-    return FALLBACK_DECISION;
-  }
+  return {
+    ...parsed,
+    income_ratio: incomeRatio,
+    confidence: Math.max(0, Math.min(1, parsed.confidence)),
+    risk_score: Math.max(0, Math.min(100, parsed.risk_score)),
+    social_media_notes: null, // Fair Housing: never include social media analysis
+  };
 }

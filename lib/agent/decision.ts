@@ -1,5 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { withAITracking } from '@/lib/ai-metrics';
+import { getModelConfig } from '@/lib/ai/models';
+import { extractJson } from '@/lib/ai/extractors';
+import { buildListingDecisionPrompt } from '@/lib/ai/prompts/listing-decision';
 import type { AIDecision } from '@/lib/types';
 export type { AIDecision };
 
@@ -22,6 +25,13 @@ interface DecisionInput {
   };
 }
 
+const FALLBACK_DECISION: AIDecision = {
+  should_list: false,
+  reasoning: 'Failed to parse AI response',
+  suggested_rent: null,
+  urgency: 'low',
+};
+
 const client = new Anthropic();
 
 export async function makeListingDecision(input: DecisionInput): Promise<AIDecision> {
@@ -29,48 +39,34 @@ export async function makeListingDecision(input: DecisionInput): Promise<AIDecis
     (new Date(input.lease.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   );
 
-  const prompt = `You are a property management AI. Decide whether to create a rental listing for this property.
+  const prompt = buildListingDecisionPrompt({
+    propertyAddress: input.property.address,
+    city: input.property.city,
+    state: input.property.state,
+    zip: input.property.zip,
+    bedrooms: input.property.bedrooms,
+    bathrooms: input.property.bathrooms,
+    sqft: input.property.sqft,
+    currentListedRent: input.property.monthly_rent ?? input.lease.monthly_rent,
+    leaseMonthlyRent: input.lease.monthly_rent,
+    daysLeft,
+    leaseEndDate: input.lease.end_date,
+    tenantName: input.lease.tenant_name,
+    renewalOffered: input.lease.renewal_offered,
+  });
 
-Property:
-- Address: ${input.property.address}
-- Location: ${input.property.city ?? 'Unknown'}, ${input.property.state ?? 'Unknown'} ${input.property.zip ?? ''}
-- Bedrooms: ${input.property.bedrooms ?? 'Unknown'}
-- Bathrooms: ${input.property.bathrooms ?? 'Unknown'}
-- Sqft: ${input.property.sqft ?? 'Unknown'}
-- Current listed rent: $${input.property.monthly_rent ?? input.lease.monthly_rent}/mo
-
-Lease:
-- Current rent: $${input.lease.monthly_rent}/mo
-- Expires in ${daysLeft} days (${input.lease.end_date})
-- Tenant: ${input.lease.tenant_name}
-- Renewal offered: ${input.lease.renewal_offered ? 'Yes' : 'No'}
-
-Decide:
-1. Should we create a listing? (Consider: days until expiry, whether renewal was offered)
-2. What rent should we suggest? (Consider current rent, market positioning)
-3. How urgent is this? (high = <14 days, medium = 14-21 days, low = 21+ days)
-
-Respond with ONLY valid JSON:
-{"should_list": boolean, "reasoning": "string", "suggested_rent": number, "urgency": "high"|"medium"|"low"}`;
+  const modelConfig = getModelConfig('decision');
 
   const response = await withAITracking(
     { service: 'listing-agent', endpoint: 'listing-decision' },
     () =>
       client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 500,
+        model: modelConfig.model,
+        max_tokens: modelConfig.maxTokens,
         messages: [{ role: 'user', content: prompt }],
       }),
   );
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
-  const json = text.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) {
-    return { should_list: false, reasoning: 'Failed to parse AI response', suggested_rent: null, urgency: 'low' };
-  }
-  try {
-    return JSON.parse(json) as AIDecision;
-  } catch {
-    return { should_list: false, reasoning: 'Failed to parse AI response', suggested_rent: null, urgency: 'low' };
-  }
+  return extractJson<AIDecision>(text, FALLBACK_DECISION);
 }

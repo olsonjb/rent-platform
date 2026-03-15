@@ -1,5 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { withAITracking } from '@/lib/ai-metrics';
+import { getModelConfig } from '@/lib/ai/models';
+import { extractJson } from '@/lib/ai/extractors';
+import { buildListingContentPrompt } from '@/lib/ai/prompts/listing-content';
 import type { AIContent } from '@/lib/types';
 export type { AIContent };
 
@@ -19,42 +22,33 @@ interface ContentInput {
 const client = new Anthropic();
 
 export async function generateListingContent(input: ContentInput): Promise<AIContent> {
-  const prompt = `You are a property marketing AI. Generate a compelling rental listing.
+  const prompt = buildListingContentPrompt({
+    propertyAddress: input.property.address,
+    city: input.property.city,
+    state: input.property.state,
+    zip: input.property.zip,
+    bedrooms: input.property.bedrooms,
+    bathrooms: input.property.bathrooms,
+    sqft: input.property.sqft,
+    suggestedRent: input.suggestedRent,
+  });
 
-Property:
-- Address: ${input.property.address}
-- Location: ${input.property.city ?? 'Unknown'}, ${input.property.state ?? 'Unknown'} ${input.property.zip ?? ''}
-- Bedrooms: ${input.property.bedrooms ?? 'Studio/Unknown'}
-- Bathrooms: ${input.property.bathrooms ?? 'Unknown'}
-- Sqft: ${input.property.sqft ? `${input.property.sqft} sq ft` : 'Not specified'}
-- Rent: $${input.suggestedRent}/mo
-
-Generate:
-1. A catchy listing title (max 80 chars)
-2. A compelling description (2-3 paragraphs)
-3. 3-5 highlights (short bullet points)
-
-Respond with ONLY valid JSON:
-{"title": "string", "description": "string", "highlights": ["string", ...]}`;
+  const modelConfig = getModelConfig('content');
 
   const response = await withAITracking(
     { service: 'listing-agent', endpoint: 'content-generation' },
     () =>
       client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
+        model: modelConfig.model,
+        max_tokens: modelConfig.maxTokens,
         messages: [{ role: 'user', content: prompt }],
       }),
   );
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
-  const json = text.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) {
-    return { title: `${input.property.address} for Rent`, description: 'Rental property available.', highlights: [] };
-  }
-  try {
-    return JSON.parse(json) as AIContent;
-  } catch {
-    return { title: `${input.property.address} for Rent`, description: 'Rental property available.', highlights: [] };
-  }
+  return extractJson<AIContent>(text, {
+    title: `${input.property.address} for Rent`,
+    description: 'Rental property available.',
+    highlights: [],
+  });
 }
