@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
+import { withAITracking } from "@/lib/ai-metrics";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
@@ -122,12 +123,16 @@ export async function POST(request: NextRequest) {
     managerPhone: property.manager_phone,
   });
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 320, // keep SMS replies concise
-    system: systemPrompt,
-    messages,
-  });
+  const response = await withAITracking(
+    { service: "sms", endpoint: "/api/sms", userId: tenant.id },
+    () =>
+      anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 320, // keep SMS replies concise
+        system: systemPrompt,
+        messages,
+      }),
+  );
 
   const rawReply =
     response.content[0].type === "text" ? response.content[0].text : "";
