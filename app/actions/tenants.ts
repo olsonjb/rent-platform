@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { validateCreateTenant } from '@/lib/validation';
 import type { LandlordTenant } from '@/lib/types';
 
 export async function getTenants(): Promise<LandlordTenant[]> {
@@ -22,6 +23,12 @@ export async function createTenant(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
+
+  const validation = validateCreateTenant(formData);
+  if (!validation.valid) {
+    const firstError = Object.values(validation.errors)[0];
+    throw new Error(firstError);
+  }
 
   const { error } = await supabase.from('landlord_tenants').insert({
     landlord_id: user.id,

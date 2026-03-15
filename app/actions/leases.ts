@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { validateCreateLease } from '@/lib/validation';
 import type { LeaseWithRelations } from '@/lib/types';
 
 export async function getLeases(): Promise<LeaseWithRelations[]> {
@@ -18,32 +19,25 @@ export async function getLeases(): Promise<LeaseWithRelations[]> {
   return (data ?? []) as LeaseWithRelations[];
 }
 
-const VALID_LEASE_STATUSES = ['active', 'pending', 'expired', 'terminated'] as const;
-
 export async function createLease(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
-  const status = formData.get('status') as string;
-  if (!VALID_LEASE_STATUSES.includes(status as (typeof VALID_LEASE_STATUSES)[number])) {
-    throw new Error(`Invalid lease status: ${status}`);
-  }
-
-  const startDate = formData.get('start_date') as string;
-  const endDate = formData.get('end_date') as string;
-  if (endDate <= startDate) {
-    throw new Error('End date must be after start date');
+  const validation = validateCreateLease(formData);
+  if (!validation.valid) {
+    const firstError = Object.values(validation.errors)[0];
+    throw new Error(firstError);
   }
 
   const { error } = await supabase.from('leases').insert({
     landlord_id: user.id,
     property_id: formData.get('property_id') as string,
     tenant_id: formData.get('tenant_id') as string,
-    start_date: startDate,
-    end_date: endDate,
+    start_date: formData.get('start_date') as string,
+    end_date: formData.get('end_date') as string,
     monthly_rent: parseFloat(formData.get('monthly_rent') as string),
-    status,
+    status: formData.get('status') as string,
   });
 
   if (error) throw error;
