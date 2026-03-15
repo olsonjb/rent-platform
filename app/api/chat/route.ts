@@ -2,8 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, buildLandlordSms } from "@/lib/twilio/sms";
+import { withAITracking } from "@/lib/ai-metrics";
+import { createLogger, withCorrelationId } from "@/lib/logger";
+import { getCorrelationId, setCorrelationIdHeader } from "@/lib/correlation";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+
+const baseLogger = createLogger("chat-api");
 
 const anthropic = new Anthropic();
 
@@ -47,6 +52,9 @@ function parseMaintenanceRequests(
 }
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request);
+  const logger = withCorrelationId(baseLogger, correlationId);
+
   try {
     const supabase = await createClient();
 
@@ -125,12 +133,16 @@ export async function POST(request: NextRequest) {
       managerPhone: property.manager_phone,
     });
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages,
-    });
+    const response = await withAITracking(
+      { service: "chat", endpoint: "/api/chat", userId: user.id, correlationId },
+      () =>
+        anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages,
+        }),
+    );
 
     const rawReply =
       response.content[0].type === "text" ? response.content[0].text : "";
@@ -169,7 +181,7 @@ export async function POST(request: NextRequest) {
           urgency: mr.urgency,
         });
         await sendSms(property.manager_phone, landlordMsg).catch(
-          (err) => console.error("Failed to SMS landlord:", err)
+          (err) => logger.error({ err }, "Failed to SMS landlord")
         );
       }
     }
@@ -182,15 +194,21 @@ export async function POST(request: NextRequest) {
       channel: "web",
     });
 
-    return NextResponse.json({
-      reply: displayText,
-      maintenanceRequests: insertedRequests,
-    });
+    return setCorrelationIdHeader(
+      NextResponse.json({
+        reply: displayText,
+        maintenanceRequests: insertedRequests,
+      }),
+      correlationId,
+    );
   } catch (error) {
-    console.error("Chat API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    logger.error({ err: error }, "Chat API error");
+    return setCorrelationIdHeader(
+      NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 },
+      ),
+      correlationId,
     );
   }
 }

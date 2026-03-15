@@ -13,6 +13,9 @@ import {
 } from "@/lib/maintenance-requests";
 import { getUserRolesFromClaims } from "@/lib/auth/user-types";
 import { createClient } from "@/lib/supabase/server";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("renter-maintenance");
 
 type MaintenanceRequestHistoryRow = {
   id: string;
@@ -104,7 +107,7 @@ async function MaintenanceRequestHistoryContent({
 
   for (const request of requests) {
     if (!isMaintenanceRequestStatus(request.status)) {
-      console.warn("Unknown maintenance request status", { requestId: request.id, status: request.status });
+      logger.warn({ requestId: request.id, status: request.status }, "Unknown maintenance request status");
       continue;
     }
 
