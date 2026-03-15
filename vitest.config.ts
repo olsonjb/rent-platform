@@ -19,7 +19,6 @@ export default defineConfig({
         "lib/application-screening.ts",
         "lib/stripe.ts",
         "lib/twilio/**",
-        "lib/types.ts",
         "lib/maintenance-requests.ts",
         "lib/auth/**",
         "lib/chat/**",

@@ -7,12 +7,12 @@ const baseContext = () => ({
   tenantName: "Jane Doe",
   unit: "101",
   rentDueDay: 1,
-  parkingPolicy: "One assigned spot per unit",
-  petPolicy: "Cats allowed, no dogs",
-  quietHours: "10 PM - 7 AM",
-  leaseTerms: "12-month lease, no subletting",
-  managerName: "Bob Manager",
-  managerPhone: "+15551234567",
+  parkingPolicy: "One assigned spot per unit" as string | null,
+  petPolicy: "Cats allowed, no dogs" as string | null,
+  quietHours: "10 PM - 7 AM" as string | null,
+  leaseTerms: "12-month lease, no subletting" as string | null,
+  managerName: "Bob Manager" as string | null,
+  managerPhone: "+15551234567" as string | null,
 });
 
 describe("buildSystemPrompt", () => {
