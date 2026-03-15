@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: "ci-${{ github.ref }}"
+  cancel-in-progress: true
+
 env:
   NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "eyJ-placeholder-key"
@@ -24,6 +28,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,6 +41,7 @@ jobs:
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,6 +54,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [lint, typecheck]
     steps:
       - uses: actions/checkout@v4
@@ -77,6 +84,7 @@ jobs:
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -90,9 +98,10 @@ jobs:
   validate-migrations:
     name: Validate Migrations
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Check SQL migration files
+      - name: Validate SQL migration files
         run: |
           MIGRATIONS_DIR="supabase/migrations"
           if [ ! -d "$MIGRATIONS_DIR" ]; then
@@ -101,27 +110,72 @@ jobs:
           fi
 
           ERRORS=0
+          FILE_COUNT=0
+          SQL_KEYWORDS="CREATE|ALTER|DROP|INSERT|UPDATE|DELETE|SELECT|GRANT|REVOKE|BEGIN|COMMIT|SET|DO|ENABLE|ADD"
+
           for f in "$MIGRATIONS_DIR"/*.sql; do
             [ -e "$f" ] || continue
+            FILE_COUNT=$((FILE_COUNT + 1))
 
+            # Check 1: File must not be empty
             if [ ! -s "$f" ]; then
               echo "ERROR: Empty migration file: $f"
               ERRORS=$((ERRORS + 1))
               continue
             fi
 
+            # Check 2: File must be text (not binary)
             if file "$f" | grep -qv "text"; then
               echo "ERROR: Non-text migration file: $f"
               ERRORS=$((ERRORS + 1))
               continue
             fi
 
-            echo "OK: $f ($(wc -l < "$f") lines)"
+            CONTENT=$(cat "$f")
+
+            # Check 3: Must contain at least one SQL keyword
+            if ! echo "$CONTENT" | grep -qiE "^[[:space:]]*(${SQL_KEYWORDS})[[:space:]]"; then
+              echo "ERROR: No SQL statements found in: $f"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            # Check 4: Last non-empty line must end with semicolon (statement termination)
+            LAST_STMT=$(echo "$CONTENT" | grep -v '^[[:space:]]*$' | grep -v '^[[:space:]]*--' | tail -1)
+            if ! echo "$LAST_STMT" | grep -q ';[[:space:]]*$'; then
+              echo "ERROR: Missing trailing semicolon in: $f"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            # Check 5: Balanced parentheses
+            OPEN=$(echo "$CONTENT" | tr -cd '(' | wc -c)
+            CLOSE=$(echo "$CONTENT" | tr -cd ')' | wc -c)
+            if [ "$OPEN" -ne "$CLOSE" ]; then
+              echo "ERROR: Unbalanced parentheses ($OPEN open, $CLOSE close) in: $f"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            # Check 6: Check for unterminated strings (odd number of single quotes)
+            QUOTES=$(echo "$CONTENT" | tr -cd "'" | wc -c)
+            if [ $((QUOTES % 2)) -ne 0 ]; then
+              echo "ERROR: Unterminated string literal (odd single quotes) in: $f"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            echo "OK: $f ($(wc -l < "$f") lines, SQL syntax checks passed)"
           done
 
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo "No .sql files found in $MIGRATIONS_DIR — skipping"
+            exit 0
+          fi
+
           if [ "$ERRORS" -gt 0 ]; then
-            echo "Found $ERRORS invalid migration file(s)"
+            echo "Found $ERRORS invalid migration file(s) out of $FILE_COUNT"
             exit 1
           fi
 
-          echo "All migration files valid"
+          echo "All $FILE_COUNT migration file(s) passed SQL validation"

@@ -11,6 +11,16 @@ Recommended branch protection rules for the `main` branch.
 | Dismiss stale PR approvals on new pushes | Yes |
 | Require status checks to pass | Yes |
 | Require branches to be up to date | Yes |
+| Do not allow force pushes | Yes |
+| Do not allow branch deletion | Yes |
+| Restrict who can push to matching branches | Yes (admin only) |
+
+## Recommended Settings
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| Require linear history | Yes | Keeps commit graph clean; enforces squash or rebase merges |
+| Require signed commits | Consider | Verifies commit author identity via GPG/SSH signatures |
 
 ## Required Status Checks
 
@@ -19,7 +29,7 @@ These CI jobs must pass before a PR can be merged:
 - **lint** — ESLint passes with no errors
 - **typecheck** — TypeScript compilation with `--noEmit` passes
 - **build** — `next build` succeeds
-- **validate-migrations** — All SQL migration files are non-empty valid text
+- **validate-migrations** — All SQL migration files parse correctly (keywords, semicolons, balanced parens, strings)
 
 ## Non-Required Status Checks
 
