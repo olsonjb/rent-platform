@@ -3,11 +3,12 @@ import { buildSystemPrompt } from "@/lib/chat/system-prompt";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, buildLandlordSms } from "@/lib/twilio/sms";
 import { withAITracking } from "@/lib/ai-metrics";
-import { createLogger } from "@/lib/logger";
+import { createLogger, withCorrelationId } from "@/lib/logger";
+import { getCorrelationId, setCorrelationIdHeader } from "@/lib/correlation";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
-const logger = createLogger("chat-api");
+const baseLogger = createLogger("chat-api");
 
 const anthropic = new Anthropic();
 
@@ -51,6 +52,9 @@ function parseMaintenanceRequests(
 }
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request);
+  const logger = withCorrelationId(baseLogger, correlationId);
+
   try {
     const supabase = await createClient();
 
@@ -130,7 +134,7 @@ export async function POST(request: NextRequest) {
     });
 
     const response = await withAITracking(
-      { service: "chat", endpoint: "/api/chat", userId: user.id },
+      { service: "chat", endpoint: "/api/chat", userId: user.id, correlationId },
       () =>
         anthropic.messages.create({
           model: "claude-sonnet-4-20250514",
@@ -190,15 +194,21 @@ export async function POST(request: NextRequest) {
       channel: "web",
     });
 
-    return NextResponse.json({
-      reply: displayText,
-      maintenanceRequests: insertedRequests,
-    });
+    return setCorrelationIdHeader(
+      NextResponse.json({
+        reply: displayText,
+        maintenanceRequests: insertedRequests,
+      }),
+      correlationId,
+    );
   } catch (error) {
     logger.error({ err: error }, "Chat API error");
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    return setCorrelationIdHeader(
+      NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 },
+      ),
+      correlationId,
     );
   }
 }

@@ -3,12 +3,13 @@ import { buildSystemPrompt } from "@/lib/chat/system-prompt";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
 import { withAITracking } from "@/lib/ai-metrics";
-import { createLogger } from "@/lib/logger";
+import { createLogger, withCorrelationId } from "@/lib/logger";
+import { getCorrelationId } from "@/lib/correlation";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
 
-const logger = createLogger("sms-api");
+const baseLogger = createLogger("sms-api");
 
 const anthropic = new Anthropic();
 
@@ -51,16 +52,21 @@ function parseMaintenanceRequests(
   return { displayText, maintenanceRequests: requests };
 }
 
-function twimlReply(message: string): NextResponse {
+function twimlReply(message: string, correlationId?: string): NextResponse {
   const MessagingResponse = twilio.twiml.MessagingResponse;
   const twiml = new MessagingResponse();
   twiml.message(message);
-  return new NextResponse(twiml.toString(), {
-    headers: { "Content-Type": "text/xml" },
-  });
+  const headers: Record<string, string> = { "Content-Type": "text/xml" };
+  if (correlationId) {
+    headers["x-correlation-id"] = correlationId;
+  }
+  return new NextResponse(twiml.toString(), { headers });
 }
 
 export async function POST(request: NextRequest) {
+  const correlationId = getCorrelationId(request);
+  const logger = withCorrelationId(baseLogger, correlationId);
+
   const formData = await request.formData();
   const from = formData.get("From") as string;
   const body = formData.get("Body") as string;
@@ -127,7 +133,7 @@ export async function POST(request: NextRequest) {
   });
 
   const response = await withAITracking(
-    { service: "sms", endpoint: "/api/sms", userId: tenant.id },
+    { service: "sms", endpoint: "/api/sms", userId: tenant.id, correlationId },
     () =>
       anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
@@ -181,5 +187,5 @@ export async function POST(request: NextRequest) {
     channel: "sms",
   });
 
-  return twimlReply(displayText);
+  return twimlReply(displayText, correlationId);
 }

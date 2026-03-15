@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { createLogger } from "@/lib/logger";
+import { createLogger, withCorrelationId } from "@/lib/logger";
+import { getCorrelationId, setCorrelationIdHeader } from "@/lib/correlation";
 
-const logger = createLogger("health");
+const baseLogger = createLogger("health");
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const correlationId = getCorrelationId(request);
+  const logger = withCorrelationId(baseLogger, correlationId);
   const checks: Record<string, "ok" | "error"> = {
     supabase: "error",
   };
@@ -28,12 +31,15 @@ export async function GET() {
     logger.warn({ checks }, "Health check degraded");
   }
 
-  return NextResponse.json(
-    {
-      status: allHealthy ? "ok" : "degraded",
-      timestamp: new Date().toISOString(),
-      checks,
-    },
-    { status },
+  return setCorrelationIdHeader(
+    NextResponse.json(
+      {
+        status: allHealthy ? "ok" : "degraded",
+        timestamp: new Date().toISOString(),
+        checks,
+      },
+      { status },
+    ),
+    correlationId,
   );
 }
