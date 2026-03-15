@@ -130,3 +130,39 @@ export interface LeaseWithRelations extends Lease {
     email: string;
   };
 }
+
+export type VendorOutreachStatus = 'sent' | 'responded' | 'no_response' | 'declined';
+export type VendorOutreachMethod = 'sms' | 'email';
+
+export interface VendorOutreach {
+  id: string;
+  maintenance_request_id: string;
+  vendor_name: string;
+  vendor_phone: string | null;
+  vendor_email: string | null;
+  outreach_method: VendorOutreachMethod;
+  message_sent: string;
+  status: VendorOutreachStatus;
+  quote_amount_cents: number | null;
+  quote_details: string | null;
+  vendor_availability: string | null;
+  sent_at: string;
+  responded_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type VendorDispatchJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
+
+export interface VendorDispatchJob {
+  id: string;
+  maintenance_request_id: string;
+  status: VendorDispatchJobStatus;
+  attempt_count: number;
+  next_attempt_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
