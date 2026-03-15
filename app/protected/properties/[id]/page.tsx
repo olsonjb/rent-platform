@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { linkRenterToProperty } from '@/app/actions/properties';
 import type { Lease, Listing } from '@/lib/types';
 import { Suspense } from 'react';
+import { GenerateListingButton } from './generate-listing-button';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -230,9 +231,15 @@ async function PropertyDetail({
       )}
 
       {/* Active Listings */}
-      <Suspense fallback={<p className="text-muted-foreground text-sm">Loading listings…</p>}>
-        <ListingsSection propertyId={id} />
-      </Suspense>
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Auto-Listings</h2>
+          <GenerateListingButton propertyId={id} />
+        </div>
+        <Suspense fallback={<p className="text-muted-foreground text-sm">Loading listings…</p>}>
+          <ListingsSection propertyId={id} />
+        </Suspense>
+      </section>
 
       {/* All leases */}
       {leases && leases.length > 0 && (
