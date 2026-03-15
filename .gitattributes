@@ -1,0 +1,71 @@
+# Auto-detect text files and normalize line endings to LF
+* text=auto eol=lf
+
+# Explicitly declare text files
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf
+*.env text eol=lf
+
+# Source code
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.jsx text eol=lf
+*.tsx text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+
+# Config / CI
+*.xml text eol=lf
+*.csv text eol=lf
+*.sql text eol=lf
+Dockerfile text eol=lf
+Makefile text eol=lf
+*.mk text eol=lf
+*.tf text eol=lf
+*.hcl text eol=lf
+
+# Git / tooling
+.gitattributes text eol=lf
+.gitignore text eol=lf
+.editorconfig text eol=lf
+
+# Shell scripts must retain LF (CRLF will break them)
+*.sh text eol=lf diff=bash
+*.bash text eol=lf diff=bash
+
+# Binary files (never normalize, never diff)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.tgz binary
+*.gz binary
+*.lock binary
+
+# Generated / large — don't diff
+*.min.js -diff
+*.min.css -diff
+package-lock.json -diff
+yarn.lock -diff
+pnpm-lock.yaml -diff
