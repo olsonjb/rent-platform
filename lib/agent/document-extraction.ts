@@ -1,6 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse') as (dataBuffer: Buffer) => Promise<{ text: string }>;
+import * as pdfParseModule from 'pdf-parse';
 import { withAITracking } from '@/lib/ai-metrics';
 import { getModelConfig } from '@/lib/ai/models';
 import { extractJson } from '@/lib/ai/extractors';
@@ -67,7 +66,9 @@ export async function extractLeaseData(pdfBuffer: Buffer): Promise<ExtractionRes
   let text: string;
 
   try {
-    const parsed = await pdfParse(pdfBuffer);
+    // pdf-parse v1 exports a single function via module.exports
+    const pdfParse = (pdfParseModule as unknown as { default: (buf: Buffer) => Promise<{ text: string }> }).default ?? pdfParseModule;
+    const parsed = await (pdfParse as (buf: Buffer) => Promise<{ text: string }>)(pdfBuffer);
     text = parsed.text;
   } catch (err) {
     logger.error({ err }, 'Failed to parse PDF');
