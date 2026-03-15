@@ -1,3 +1,7 @@
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("maintenance-review-worker");
+
 const resolveAppOrigin = (): string | null => {
   const configured = process.env.NEXT_PUBLIC_SITE_URL;
   if (typeof configured === "string" && configured.length > 0) {
@@ -46,6 +50,6 @@ async function triggerMaintenanceReviewProcessing(): Promise<void> {
 
 export function triggerMaintenanceReviewProcessingInBackground(): void {
   void triggerMaintenanceReviewProcessing().catch((error: unknown) => {
-    console.error("Failed to trigger maintenance review processing", error);
+    logger.error({ err: error }, "Failed to trigger maintenance review processing");
   });
 }

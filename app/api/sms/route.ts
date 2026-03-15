@@ -3,9 +3,12 @@ import { buildSystemPrompt } from "@/lib/chat/system-prompt";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
 import { withAITracking } from "@/lib/ai-metrics";
+import { createLogger } from "@/lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
+
+const logger = createLogger("sms-api");
 
 const anthropic = new Anthropic();
 
@@ -165,7 +168,7 @@ export async function POST(request: NextRequest) {
         urgency: mr.urgency,
       });
       await sendSms(property.manager_phone, landlordMsg).catch((err) =>
-        console.error("Failed to SMS landlord:", err)
+        logger.error({ err }, "Failed to SMS landlord")
       );
     }
   }

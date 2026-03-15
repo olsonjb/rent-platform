@@ -3,8 +3,11 @@ import { buildSystemPrompt } from "@/lib/chat/system-prompt";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, buildLandlordSms } from "@/lib/twilio/sms";
 import { withAITracking } from "@/lib/ai-metrics";
+import { createLogger } from "@/lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+
+const logger = createLogger("chat-api");
 
 const anthropic = new Anthropic();
 
@@ -174,7 +177,7 @@ export async function POST(request: NextRequest) {
           urgency: mr.urgency,
         });
         await sendSms(property.manager_phone, landlordMsg).catch(
-          (err) => console.error("Failed to SMS landlord:", err)
+          (err) => logger.error({ err }, "Failed to SMS landlord")
         );
       }
     }
@@ -192,7 +195,7 @@ export async function POST(request: NextRequest) {
       maintenanceRequests: insertedRequests,
     });
   } catch (error) {
-    console.error("Chat API error:", error);
+    logger.error({ err: error }, "Chat API error");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runListingAgent } from '@/lib/agent/listing-agent';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('cron-check-leases');
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -26,7 +29,7 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error('Listing agent error:', error);
+    logger.error({ err: error }, 'Listing agent error');
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal error' },
       { status: 500 }

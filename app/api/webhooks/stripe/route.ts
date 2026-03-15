@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe, getStripeMode } from '@/lib/stripe';
 import { createServiceClient } from '@/lib/supabase/service';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('stripe-webhook');
 
 const WEBHOOK_SECRETS = {
   demo: process.env.STRIPE_TEST_WEBHOOK_SECRET,
@@ -21,7 +24,7 @@ export async function POST(req: NextRequest) {
   if (!webhookSecret) {
     const varName =
       mode === 'demo' ? 'STRIPE_TEST_WEBHOOK_SECRET' : 'STRIPE_LIVE_WEBHOOK_SECRET';
-    console.error(`${varName} is not configured`);
+    logger.error({ varName }, 'Stripe webhook secret is not configured');
     return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
   }
 
@@ -31,9 +34,9 @@ export async function POST(req: NextRequest) {
     const body = Buffer.from(await req.bytes());
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err) {
-    console.error(
-      'Webhook signature verification failed:',
-      err instanceof Error ? err.message : err,
+    logger.error(
+      { err: err instanceof Error ? err.message : err },
+      'Webhook signature verification failed',
     );
     return NextResponse.json({ error: 'Webhook verification failed' }, { status: 400 });
   }
@@ -50,7 +53,7 @@ export async function POST(req: NextRequest) {
         typeof session.setup_intent === 'string' ? session.setup_intent : null;
 
       if (!userId) {
-        console.error('No user ID found in setup session');
+        logger.error({ sessionId: session.id }, 'No user ID found in setup session');
         return NextResponse.json({ error: 'Missing user reference' }, { status: 400 });
       }
 
@@ -71,7 +74,7 @@ export async function POST(req: NextRequest) {
         .eq('id', userId);
 
       if (error) {
-        console.error('Failed to update profile payment status:', error);
+        logger.error({ err: error }, 'Failed to update profile payment status');
         return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
       }
 
@@ -102,7 +105,7 @@ export async function POST(req: NextRequest) {
       .eq('stripe_checkout_id', session.id);
 
     if (error) {
-      console.error('Failed to update payment record:', error);
+      logger.error({ err: error }, 'Failed to update payment record');
       return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
     }
   }
