@@ -153,3 +153,101 @@ export async function goToStep(step: OnboardingStep): Promise<void> {
     .update({ onboarding_step: step })
     .eq('id', user.id);
 }
+
+/** Create property without redirecting — for use in onboarding wizard. */
+export async function onboardingCreateProperty(formData: FormData): Promise<{ error?: string }> {
+  const { validateCreateProperty } = await import('@/lib/validation');
+  const { user, supabase } = await getAuthenticatedLandlord();
+
+  const validation = validateCreateProperty(formData);
+  if (!validation.valid) {
+    return { error: Object.values(validation.errors)[0] };
+  }
+
+  const { error } = await supabase.from('properties').insert({
+    landlord_id: user.id,
+    name: formData.get('name') as string,
+    address: formData.get('address') as string,
+    city: formData.get('city') as string,
+    state: formData.get('state') as string,
+    zip: formData.get('zip') as string,
+    bedrooms: parseInt(formData.get('bedrooms') as string, 10),
+    bathrooms: parseFloat(formData.get('bathrooms') as string),
+    monthly_rent: parseFloat(formData.get('monthly_rent') as string),
+    rent_due_day: parseInt(formData.get('rent_due_day') as string, 10) || 1,
+  });
+
+  if (error) return { error: error.message };
+  return {};
+}
+
+/** Create tenant without redirecting — for use in onboarding wizard. */
+export async function onboardingCreateTenant(formData: FormData): Promise<{ error?: string }> {
+  const { validateCreateTenant } = await import('@/lib/validation');
+  const { user, supabase } = await getAuthenticatedLandlord();
+
+  const validation = validateCreateTenant(formData);
+  if (!validation.valid) {
+    return { error: Object.values(validation.errors)[0] };
+  }
+
+  const { error } = await supabase.from('landlord_tenants').insert({
+    landlord_id: user.id,
+    name: formData.get('name') as string,
+    email: formData.get('email') as string,
+    phone: (formData.get('phone') as string) || null,
+  });
+
+  if (error) return { error: error.message };
+  return {};
+}
+
+/** Create lease without redirecting — for use in onboarding wizard. */
+export async function onboardingCreateLease(formData: FormData): Promise<{ error?: string }> {
+  const { validateCreateLease } = await import('@/lib/validation');
+  const { user, supabase } = await getAuthenticatedLandlord();
+
+  const validation = validateCreateLease(formData);
+  if (!validation.valid) {
+    return { error: Object.values(validation.errors)[0] };
+  }
+
+  const { error } = await supabase.from('leases').insert({
+    landlord_id: user.id,
+    property_id: formData.get('property_id') as string,
+    tenant_id: formData.get('tenant_id') as string,
+    start_date: formData.get('start_date') as string,
+    end_date: formData.get('end_date') as string,
+    monthly_rent: parseFloat(formData.get('monthly_rent') as string),
+    status: formData.get('status') as string,
+  });
+
+  if (error) return { error: error.message };
+  return {};
+}
+
+/** Save profile info (name, phone) during onboarding. */
+export async function onboardingSaveProfile(formData: FormData): Promise<{ error?: string }> {
+  const { user } = await getAuthenticatedLandlord();
+  const svc = createServiceClient();
+
+  const fullName = (formData.get('full_name') as string)?.trim();
+  if (!fullName) {
+    return { error: 'Full name is required' };
+  }
+
+  const { error } = await svc
+    .from('profiles')
+    .upsert(
+      {
+        id: user.id,
+        email: user.email,
+        full_name: fullName,
+        phone: (formData.get('phone') as string)?.trim() || null,
+      },
+      { onConflict: 'id' },
+    );
+
+  if (error) return { error: error.message };
+  return {};
+}
