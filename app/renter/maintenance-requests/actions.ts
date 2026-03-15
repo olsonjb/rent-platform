@@ -10,6 +10,9 @@ import {
 import { getUserRolesFromClaims } from "@/lib/auth/user-types";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { createClient } from "@/lib/supabase/server";
+import { validatePhotoFile, uploadMaintenancePhoto } from "@/lib/storage/photos";
+
+const MAX_PHOTOS = 5;
 
 const isNonEmptyString = (value: FormDataEntryValue | null): value is string => {
   return typeof value === "string" && value.trim().length > 0;
@@ -84,6 +87,28 @@ export async function createMaintenanceRequest(formData: FormData) {
     ? phoneValue.trim()
     : redirectWithError("Please provide a contact number.");
 
+  // Validate photos server-side
+  const photoFiles = formData.getAll("photos").filter(
+    (entry): entry is File => entry instanceof File && entry.size > 0,
+  );
+
+  if (photoFiles.length > MAX_PHOTOS) {
+    redirectWithError(`Maximum ${MAX_PHOTOS} photos allowed.`);
+  }
+
+  for (const file of photoFiles) {
+    const validation = validatePhotoFile(file);
+    if (!validation.valid) {
+      const msg =
+        validation.error.type === "too_large"
+          ? "Photo exceeds 10MB limit."
+          : validation.error.type === "invalid_type"
+            ? "Only JPEG, PNG, WebP, and GIF images are allowed."
+            : "Invalid photo file.";
+      redirectWithError(msg);
+    }
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -130,23 +155,53 @@ export async function createMaintenanceRequest(formData: FormData) {
     }
   }
 
-  const { error } = await supabase.from("maintenance_requests").insert({
-    tenant_id: user.id,
-    issue: issueTitle,
-    unit,
-    location: locationValue,
-    urgency: urgencyValue,
-    details,
-    entry_permission: entryPermissionValue,
-    contact_phone: contactPhone,
-  });
+  // Insert the maintenance request first to get the ID
+  const { data: insertedRequest, error } = await supabase
+    .from("maintenance_requests")
+    .insert({
+      tenant_id: user.id,
+      issue: issueTitle,
+      unit,
+      location: locationValue,
+      urgency: urgencyValue,
+      details,
+      entry_permission: entryPermissionValue,
+      contact_phone: contactPhone,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    redirectWithError("Unable to submit request. Please try again.");
+  if (error || !insertedRequest) {
+    return redirectWithError("Unable to submit request. Please try again.");
+  }
+
+  const requestId: string = insertedRequest.id;
+
+  // Upload photos and store URLs
+  if (photoFiles.length > 0) {
+    const photoUrls: string[] = [];
+
+    for (let i = 0; i < photoFiles.length; i++) {
+      const url = await uploadMaintenancePhoto(photoFiles[i], requestId, i);
+      if (url) {
+        photoUrls.push(url);
+      }
+    }
+
+    if (photoUrls.length > 0) {
+      await supabase
+        .from("maintenance_requests")
+        .update({ photos: photoUrls })
+        .eq("id", requestId);
+    }
   }
 
   triggerMaintenanceReviewProcessingInBackground();
 
   revalidatePath("/renter/maintenance-requests");
-  redirect("/renter/maintenance-requests?success=1");
+  const params = new URLSearchParams({
+    success: "1",
+    requestId,
+  });
+  redirect(`/renter/maintenance-requests/new?${params.toString()}`);
 }

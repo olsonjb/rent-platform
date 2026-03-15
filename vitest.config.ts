@@ -24,6 +24,7 @@ export default defineConfig({
         "lib/chat/**",
         "lib/validation.ts",
         "lib/api-response.ts",
+        "lib/storage/**",
       ],
       thresholds: {
         lines: 80,
