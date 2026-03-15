@@ -19,7 +19,7 @@ type VendorContact = {
   user_ratings_total: number | null;
 };
 
-type CostEstimate = {
+export type CostEstimate = {
   trade: string;
   severity: "low" | "medium" | "high" | "critical";
   estimated_cost_min: number;
@@ -28,7 +28,7 @@ type CostEstimate = {
   summary: string;
 };
 
-type MaintenanceRequestContext = {
+export type MaintenanceRequestContext = {
   id: string;
   issue: string;
   details: string | null;
@@ -60,7 +60,7 @@ const getRequiredEnv = (name: string): string => {
   return value;
 };
 
-const getMaxRetries = (): number => {
+export const getMaxRetries = (): number => {
   const configured = process.env.MAINTENANCE_REVIEW_MAX_RETRIES;
 
   if (!configured) {
@@ -71,7 +71,7 @@ const getMaxRetries = (): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_RETRIES;
 };
 
-const getDefaultBatchSize = (): number => {
+export const getDefaultBatchSize = (): number => {
   const configured = process.env.MAINTENANCE_REVIEW_BATCH_SIZE;
 
   if (!configured) {
@@ -82,7 +82,7 @@ const getDefaultBatchSize = (): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_BATCH_SIZE;
 };
 
-const normalizeConfidence = (value: number): number => {
+export const normalizeConfidence = (value: number): number => {
   if (value < 0) {
     return 0;
   }
@@ -94,7 +94,7 @@ const normalizeConfidence = (value: number): number => {
   return Number(value.toFixed(3));
 };
 
-const sanitizeCostEstimate = (estimate: CostEstimate): CostEstimate => {
+export const sanitizeCostEstimate = (estimate: CostEstimate): CostEstimate => {
   const minimum = Math.max(0, Math.round(estimate.estimated_cost_min));
   const maximum = Math.max(minimum, Math.round(estimate.estimated_cost_max));
 
@@ -106,7 +106,7 @@ const sanitizeCostEstimate = (estimate: CostEstimate): CostEstimate => {
   };
 };
 
-const parseEstimateJson = (raw: string): CostEstimate => {
+export const parseEstimateJson = (raw: string): CostEstimate => {
   const parsed = JSON.parse(raw) as Partial<CostEstimate>;
 
   if (
@@ -127,7 +127,7 @@ const parseEstimateJson = (raw: string): CostEstimate => {
   return sanitizeCostEstimate(parsed as CostEstimate);
 };
 
-const buildEstimatePrompt = (context: MaintenanceRequestContext): string => {
+export const buildEstimatePrompt = (context: MaintenanceRequestContext): string => {
   return [
     "Estimate this maintenance request for a US residential property.",
     "Return JSON only with keys:",
@@ -149,7 +149,7 @@ const buildEstimatePrompt = (context: MaintenanceRequestContext): string => {
   ].join("\n");
 };
 
-const buildPlacesQuery = (context: MaintenanceRequestContext, trade: string): string => {
+export const buildPlacesQuery = (context: MaintenanceRequestContext, trade: string): string => {
   return `${trade} repair near ${context.property_address}`;
 };
 

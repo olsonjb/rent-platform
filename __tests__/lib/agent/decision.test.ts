@@ -12,13 +12,13 @@ import { makeListingDecision } from "@/lib/agent/decision";
 const baseInput = () => ({
   property: {
     address: "456 Oak Ave",
-    city: "Salt Lake City",
-    state: "UT",
-    zip: "84101",
-    bedrooms: 2,
-    bathrooms: 1,
-    sqft: 900,
-    monthly_rent: 1200,
+    city: "Salt Lake City" as string | null,
+    state: "UT" as string | null,
+    zip: "84101" as string | null,
+    bedrooms: 2 as number | null,
+    bathrooms: 1 as number | null,
+    sqft: 900 as number | null,
+    monthly_rent: 1200 as number | null,
   },
   lease: {
     end_date: new Date(Date.now() + 10 * 86400000).toISOString().split("T")[0],

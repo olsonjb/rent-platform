@@ -12,12 +12,12 @@ import { generateListingContent } from "@/lib/agent/content";
 const baseInput = () => ({
   property: {
     address: "789 Elm St",
-    city: "Provo",
-    state: "UT",
-    zip: "84601",
-    bedrooms: 3,
-    bathrooms: 2,
-    sqft: 1200,
+    city: "Provo" as string | null,
+    state: "UT" as string | null,
+    zip: "84601" as string | null,
+    bedrooms: 3 as number | null,
+    bathrooms: 2 as number | null,
+    sqft: 1200 as number | null,
   },
   suggestedRent: 1500,
 });
