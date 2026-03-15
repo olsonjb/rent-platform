@@ -1,0 +1,23 @@
+{
+  "project": "Auto PM — Code Factory Execution",
+  "created_at": "2026-03-15",
+  "review_threshold": 9.5,
+  "max_review_cycles": 3,
+  "tasks": {
+    "T01": { "name": "CI/CD Pipeline", "wave": 1, "depends_on": [], "max_iterations": 20, "reviewer_role": "DevOps Engineer", "status": "in_progress", "branch": "ralph/t01-cicd", "attempts": 1, "scores": [], "plan_approved": true, "completed_at": null },
+    "T02": { "name": "Test Infrastructure", "wave": 1, "depends_on": [], "max_iterations": 50, "reviewer_role": "QA Architect", "status": "in_progress", "branch": "ralph/t02-test-infra", "attempts": 1, "scores": [], "plan_approved": true, "completed_at": null },
+    "T03": { "name": "Observability Stack", "wave": 1, "depends_on": [], "max_iterations": 35, "reviewer_role": "SRE", "status": "in_progress", "branch": "ralph/t03-observability", "attempts": 1, "scores": [], "plan_approved": true, "completed_at": null },
+    "T04": { "name": "Twilio Security", "wave": 2, "depends_on": ["T02"], "max_iterations": 35, "reviewer_role": "Security Engineer", "status": "pending", "branch": "ralph/t04-twilio-security", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T05": { "name": "Rate Limiting", "wave": 2, "depends_on": ["T02"], "max_iterations": 20, "reviewer_role": "Security Engineer", "status": "pending", "branch": "ralph/t05-rate-limiting", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T06": { "name": "Architecture Hardening", "wave": 2, "depends_on": ["T02"], "max_iterations": 35, "reviewer_role": "Software Architect", "status": "pending", "branch": "ralph/t06-arch-hardening", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T07": { "name": "Screening Compliance", "wave": 3, "depends_on": ["T02", "T04"], "max_iterations": 50, "reviewer_role": "Compliance Engineer", "status": "pending", "branch": "ralph/t07-screening-compliance", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T08": { "name": "Real Listing Provider", "wave": 3, "depends_on": ["T02", "T04"], "max_iterations": 35, "reviewer_role": "Integration Engineer", "status": "pending", "branch": "ralph/t08-listing-provider", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T09": { "name": "Rent Collection (ACH)", "wave": 3, "depends_on": ["T02", "T04"], "max_iterations": 50, "reviewer_role": "Payments Engineer", "status": "pending", "branch": "ralph/t09-ach-payments", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T10": { "name": "Onboarding Flow", "wave": 4, "depends_on": ["T06"], "max_iterations": 35, "reviewer_role": "Product Engineer", "status": "pending", "branch": "ralph/t10-onboarding", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T11": { "name": "Tenant Self-Service Portal", "wave": 4, "depends_on": ["T06"], "max_iterations": 35, "reviewer_role": "Frontend Engineer", "status": "pending", "branch": "ralph/t11-tenant-portal", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T12": { "name": "Prompt Registry", "wave": 4, "depends_on": ["T06"], "max_iterations": 35, "reviewer_role": "ML Engineer", "status": "pending", "branch": "ralph/t12-prompt-registry", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T13": { "name": "Vendor Dispatch Agent", "wave": 5, "depends_on": ["T07", "T08", "T12"], "max_iterations": 60, "reviewer_role": "Software Architect", "status": "pending", "branch": "ralph/t13-vendor-dispatch", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T14": { "name": "Lease Renewal Agent", "wave": 5, "depends_on": ["T07", "T08", "T12"], "max_iterations": 60, "reviewer_role": "Software Architect", "status": "pending", "branch": "ralph/t14-lease-renewal", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null },
+    "T15": { "name": "Document Intelligence", "wave": 5, "depends_on": ["T07", "T08", "T12"], "max_iterations": 50, "reviewer_role": "ML Engineer", "status": "pending", "branch": "ralph/t15-doc-intelligence", "attempts": 0, "scores": [], "plan_approved": false, "completed_at": null }
+  }
+}
