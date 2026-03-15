@@ -5,6 +5,12 @@ import { sendSms, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/
 import { withAITracking } from "@/lib/ai-metrics";
 import { createLogger, withCorrelationId } from "@/lib/logger";
 import { getCorrelationId } from "@/lib/correlation";
+import {
+  rateLimit,
+  RATE_LIMIT_CONFIGS,
+  shouldBypass,
+  rateLimitHeaders,
+} from "@/lib/rate-limit";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
@@ -73,6 +79,29 @@ export async function POST(request: NextRequest) {
 
   if (!from || !body) {
     return twimlReply("Sorry, we couldn't process your message.");
+  }
+
+  // Rate limiting: 10 messages per minute per phone number
+  if (!shouldBypass(request.headers)) {
+    const rlResult = await rateLimit(
+      `sms:${from}`,
+      RATE_LIMIT_CONFIGS.sms,
+    );
+
+    if (!rlResult.allowed) {
+      const rlHeaders = rateLimitHeaders(rlResult, RATE_LIMIT_CONFIGS.sms);
+      const MessagingResponse = twilio.twiml.MessagingResponse;
+      const twiml = new MessagingResponse();
+      twiml.message("You're sending messages too quickly. Please wait a moment and try again.");
+      const headers: Record<string, string> = {
+        "Content-Type": "text/xml",
+        ...rlHeaders,
+      };
+      if (correlationId) {
+        headers["x-correlation-id"] = correlationId;
+      }
+      return new NextResponse(twiml.toString(), { status: 429, headers });
+    }
   }
 
   const supabase = createServiceClient();
