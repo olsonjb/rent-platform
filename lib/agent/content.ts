@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { withAITracking } from '@/lib/ai-metrics';
 import { getModelConfig } from '@/lib/ai/models';
+import { extractJson } from '@/lib/ai/extractors';
 import { buildListingContentPrompt } from '@/lib/ai/prompts/listing-content';
 import type { AIContent } from '@/lib/types';
 export type { AIContent };
@@ -45,13 +46,9 @@ export async function generateListingContent(input: ContentInput): Promise<AICon
   );
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
-  const json = text.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) {
-    return { title: `${input.property.address} for Rent`, description: 'Rental property available.', highlights: [] };
-  }
-  try {
-    return JSON.parse(json) as AIContent;
-  } catch {
-    return { title: `${input.property.address} for Rent`, description: 'Rental property available.', highlights: [] };
-  }
+  return extractJson<AIContent>(text, {
+    title: `${input.property.address} for Rent`,
+    description: 'Rental property available.',
+    highlights: [],
+  });
 }

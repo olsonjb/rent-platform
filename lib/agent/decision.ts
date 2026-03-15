@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { withAITracking } from '@/lib/ai-metrics';
 import { getModelConfig } from '@/lib/ai/models';
+import { extractJson } from '@/lib/ai/extractors';
 import { buildListingDecisionPrompt } from '@/lib/ai/prompts/listing-decision';
 import type { AIDecision } from '@/lib/types';
 export type { AIDecision };
@@ -23,6 +24,13 @@ interface DecisionInput {
     renewal_offered: boolean;
   };
 }
+
+const FALLBACK_DECISION: AIDecision = {
+  should_list: false,
+  reasoning: 'Failed to parse AI response',
+  suggested_rent: null,
+  urgency: 'low',
+};
 
 const client = new Anthropic();
 
@@ -60,13 +68,5 @@ export async function makeListingDecision(input: DecisionInput): Promise<AIDecis
   );
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
-  const json = text.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) {
-    return { should_list: false, reasoning: 'Failed to parse AI response', suggested_rent: null, urgency: 'low' };
-  }
-  try {
-    return JSON.parse(json) as AIDecision;
-  } catch {
-    return { should_list: false, reasoning: 'Failed to parse AI response', suggested_rent: null, urgency: 'low' };
-  }
+  return extractJson<AIDecision>(text, FALLBACK_DECISION);
 }

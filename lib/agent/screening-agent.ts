@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { withAITracking } from '@/lib/ai-metrics';
 import { getModelConfig } from '@/lib/ai/models';
+import { extractJson } from '@/lib/ai/extractors';
 import { buildScreeningPrompt } from '@/lib/ai/prompts/screening';
 import type { ScreeningDecision } from '@/lib/types';
 
@@ -70,19 +71,14 @@ export async function screenApplication(input: ScreeningInput): Promise<Screenin
   );
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '';
-  const json = text.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) {
+  const parsed = extractJson<ScreeningDecision | null>(text, null);
+  if (!parsed) {
     return FALLBACK_DECISION;
   }
-  try {
-    const parsed = JSON.parse(json) as ScreeningDecision;
-    return {
-      ...parsed,
-      income_ratio: incomeRatio,
-      confidence: Math.max(0, Math.min(1, parsed.confidence)),
-      risk_score: Math.max(0, Math.min(100, parsed.risk_score)),
-    };
-  } catch {
-    return FALLBACK_DECISION;
-  }
+  return {
+    ...parsed,
+    income_ratio: incomeRatio,
+    confidence: Math.max(0, Math.min(1, parsed.confidence)),
+    risk_score: Math.max(0, Math.min(100, parsed.risk_score)),
+  };
 }
