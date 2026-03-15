@@ -5,6 +5,12 @@ import { sendSms, buildLandlordSms } from "@/lib/twilio/sms";
 import { withAITracking } from "@/lib/ai-metrics";
 import { createLogger, withCorrelationId } from "@/lib/logger";
 import { getCorrelationId, setCorrelationIdHeader } from "@/lib/correlation";
+import {
+  rateLimit,
+  RATE_LIMIT_CONFIGS,
+  shouldBypass,
+  rateLimitHeaders,
+} from "@/lib/rate-limit";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -65,6 +71,32 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limiting: 20 messages per minute per user
+    let rlHeaders: Record<string, string> = {};
+    if (!shouldBypass(request.headers)) {
+      const rlResult = await rateLimit(
+        `chat:${user.id}`,
+        RATE_LIMIT_CONFIGS.chat,
+      );
+      rlHeaders = rateLimitHeaders(rlResult, RATE_LIMIT_CONFIGS.chat);
+
+      if (!rlResult.allowed) {
+        return setCorrelationIdHeader(
+          new NextResponse(
+            JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+            {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                ...rlHeaders,
+              },
+            },
+          ),
+          correlationId,
+        );
+      }
     }
 
     const { message } = await request.json();
@@ -194,13 +226,14 @@ export async function POST(request: NextRequest) {
       channel: "web",
     });
 
-    return setCorrelationIdHeader(
-      NextResponse.json({
-        reply: displayText,
-        maintenanceRequests: insertedRequests,
-      }),
-      correlationId,
-    );
+    const jsonResponse = NextResponse.json({
+      reply: displayText,
+      maintenanceRequests: insertedRequests,
+    });
+    for (const [k, v] of Object.entries(rlHeaders)) {
+      jsonResponse.headers.set(k, v);
+    }
+    return setCorrelationIdHeader(jsonResponse, correlationId);
   } catch (error) {
     logger.error({ err: error }, "Chat API error");
     return setCorrelationIdHeader(
