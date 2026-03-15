@@ -1,4 +1,5 @@
 import Link from "next/link";
+import UpcomingRenewals from "./components/upcoming-renewals";
 
 export default function LandlordDashboardPage() {
   return (
@@ -9,6 +10,7 @@ export default function LandlordDashboardPage() {
       <h1 className="text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
         Landlord dashboard
       </h1>
+      <UpcomingRenewals />
       <div className="rounded-2xl border border-zinc-900/10 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold tracking-tight text-zinc-900">Maintenance operations</h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-600">

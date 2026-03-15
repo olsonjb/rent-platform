@@ -146,3 +146,57 @@ export interface RentInvoice {
   created_at: string;
   paid_at: string | null;
 }
+
+export type RenewalOfferStatus = 'pending' | 'accepted' | 'declined' | 'expired';
+
+export type RenewalRecommendation = 'renew-adjust' | 'renew-same' | 'do-not-renew';
+
+export interface RenewalEvaluation {
+  recommendation: RenewalRecommendation;
+  suggested_rent: number;
+  reasoning: string;
+  tenant_score: number;
+  factors: {
+    payment_history: string;
+    maintenance_requests: string;
+    tenure_length: string;
+    communication: string;
+  };
+}
+
+export interface RenewalOffer {
+  id: string;
+  lease_id: string;
+  tenant_id: string;
+  landlord_id: string;
+  new_monthly_rent: number;
+  new_end_date: string;
+  offer_letter: string | null;
+  status: RenewalOfferStatus;
+  ai_recommendation: string | null;
+  ai_reasoning: string | null;
+  suggested_rent_adjustment: number | null;
+  sent_at: string | null;
+  responded_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RenewalOfferWithRelations extends RenewalOffer {
+  leases: {
+    monthly_rent: number;
+    start_date: string;
+    end_date: string;
+    property_id: string;
+    properties: {
+      address: string;
+      city: string | null;
+      state: string | null;
+    };
+  };
+  landlord_tenants: {
+    name: string;
+    email: string;
+  };
+}

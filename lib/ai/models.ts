@@ -1,7 +1,7 @@
 import type { AIModelConfig } from './types';
 
 /** Service names that map to AI model configurations. */
-export type AIService = 'chat' | 'screening' | 'decision' | 'content' | 'maintenance';
+export type AIService = 'chat' | 'screening' | 'decision' | 'content' | 'maintenance' | 'renewal';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 
@@ -12,6 +12,7 @@ const MODEL_DEFAULTS: Record<AIService, AIModelConfig> = {
   decision: { model: DEFAULT_MODEL, maxTokens: 500 },
   content: { model: DEFAULT_MODEL, maxTokens: 1000 },
   maintenance: { model: DEFAULT_MODEL, maxTokens: 500, temperature: 0.2 },
+  renewal: { model: DEFAULT_MODEL, maxTokens: 1000, temperature: 0.3 },
 };
 
 /** Environment variable names per service for model override. */
@@ -21,6 +22,7 @@ const ENV_KEYS: Record<AIService, string> = {
   decision: 'AI_MODEL_DECISION',
   content: 'AI_MODEL_CONTENT',
   maintenance: 'AI_MODEL_MAINTENANCE',
+  renewal: 'AI_MODEL_RENEWAL',
 };
 
 /**
