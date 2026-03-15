@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { runListingAgent } from '@/lib/agent/listing-agent';
+import { apiSuccess, apiError } from '@/lib/api-response';
 import { createLogger, withCorrelationId } from '@/lib/logger';
-import { getCorrelationId, setCorrelationIdHeader } from '@/lib/correlation';
+import { getCorrelationId } from '@/lib/correlation';
 
 const baseLogger = createLogger('cron-check-leases');
 
@@ -13,13 +14,13 @@ export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return apiError('Unauthorized', 401, correlationId, 'UNAUTHORIZED');
   }
 
   try {
     const results = await runListingAgent();
-    return setCorrelationIdHeader(
-      NextResponse.json({
+    return apiSuccess(
+      {
         processed: results.length,
         results: results.map((r) => ({
           leaseId: r.leaseId,
@@ -32,16 +33,14 @@ export async function GET(request: NextRequest) {
             url: p.listingUrl,
           })),
         })),
-      }),
+      },
       correlationId,
     );
   } catch (error) {
     logger.error({ err: error }, 'Listing agent error');
-    return setCorrelationIdHeader(
-      NextResponse.json(
-        { error: error instanceof Error ? error.message : 'Internal error' },
-        { status: 500 },
-      ),
+    return apiError(
+      error instanceof Error ? error.message : 'Internal error',
+      500,
       correlationId,
     );
   }

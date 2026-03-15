@@ -3,11 +3,12 @@ import { buildSystemPrompt } from "@/lib/chat/system-prompt";
 import { parseMaintenanceRequests } from "@/lib/chat/parse-maintenance";
 import { handleMaintenanceRequests } from "@/lib/chat/handle-maintenance";
 import { getConversationHistory } from "@/lib/chat/history";
+import { apiSuccess, apiError } from "@/lib/api-response";
 import { withAITracking } from "@/lib/ai-metrics";
 import { createLogger, withCorrelationId } from "@/lib/logger";
-import { getCorrelationId, setCorrelationIdHeader } from "@/lib/correlation";
+import { getCorrelationId } from "@/lib/correlation";
 import Anthropic from "@anthropic-ai/sdk";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 const baseLogger = createLogger("chat-api");
 
@@ -26,15 +27,12 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401, correlationId, "UNAUTHORIZED");
     }
 
     const { message } = await request.json();
     if (!message || typeof message !== "string") {
-      return NextResponse.json(
-        { error: "Message is required" },
-        { status: 400 }
-      );
+      return apiError("Message is required", 400, correlationId, "INVALID_INPUT");
     }
 
     // Fetch tenant profile + property
@@ -45,10 +43,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (tenantError || !tenant) {
-      return NextResponse.json(
-        { error: "Tenant profile not found" },
-        { status: 404 }
-      );
+      return apiError("Tenant profile not found", 404, correlationId, "NOT_FOUND");
     }
 
     const property = tenant.properties as typeof tenant.properties & {
@@ -121,21 +116,12 @@ export async function POST(request: NextRequest) {
       channel: "web",
     });
 
-    return setCorrelationIdHeader(
-      NextResponse.json({
-        reply: displayText,
-        maintenanceRequests: insertedRequests,
-      }),
+    return apiSuccess(
+      { reply: displayText, maintenanceRequests: insertedRequests },
       correlationId,
     );
   } catch (error) {
     logger.error({ err: error }, "Chat API error");
-    return setCorrelationIdHeader(
-      NextResponse.json(
-        { error: "Internal server error" },
-        { status: 500 },
-      ),
-      correlationId,
-    );
+    return apiError("Internal server error", 500, correlationId);
   }
 }
