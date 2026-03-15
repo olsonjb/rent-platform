@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
@@ -23,7 +24,30 @@ function statusBadge(status: RentInvoice['status']) {
   );
 }
 
-export default async function RenterPaymentsPage() {
+export default function RenterPaymentsPage() {
+  return (
+    <Suspense fallback={<PaymentsSkeleton />}>
+      <PaymentsContent />
+    </Suspense>
+  );
+}
+
+function PaymentsSkeleton() {
+  return (
+    <div className="max-w-4xl space-y-6">
+      <div className="h-6 w-32 animate-pulse rounded-full bg-emerald-100" />
+      <div className="h-10 w-64 animate-pulse rounded-lg bg-zinc-100" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-24 animate-pulse rounded-2xl bg-zinc-100" />
+        ))}
+      </div>
+      <div className="h-48 animate-pulse rounded-2xl bg-zinc-100" />
+    </div>
+  );
+}
+
+async function PaymentsContent() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return redirect('/auth/login');
