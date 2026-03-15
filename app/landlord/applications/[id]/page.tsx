@@ -12,8 +12,9 @@ type ApplicationDetailPageProps = {
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
   screening: "Screening",
-  approved: "AI Approved",
-  denied: "AI Denied",
+  ai_reviewed: "AI Review Complete — Awaiting Landlord Decision",
+  approved: "AI Approved (Legacy)",
+  denied: "AI Denied (Legacy)",
   landlord_approved: "Approved by Landlord",
   landlord_denied: "Denied by Landlord",
   withdrawn: "Withdrawn",
@@ -22,6 +23,7 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800",
   screening: "bg-blue-100 text-blue-800",
+  ai_reviewed: "bg-indigo-100 text-indigo-800",
   approved: "bg-emerald-100 text-emerald-800",
   denied: "bg-rose-100 text-rose-800",
   landlord_approved: "bg-emerald-100 text-emerald-800",
@@ -93,6 +95,11 @@ async function DetailContent({ params }: ApplicationDetailPageProps) {
         Back to applications
       </Link>
 
+      <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="font-semibold">Fair Housing Act Compliance Notice</p>
+        <p className="mt-1">AI screening recommendations are advisory only. Final decisions must comply with the Fair Housing Act. You are responsible for ensuring non-discriminatory practices.</p>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-950">{app.full_name}</h1>
         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[app.status] ?? "bg-zinc-100 text-zinc-600"}`}>
@@ -162,9 +169,6 @@ async function DetailContent({ params }: ApplicationDetailPageProps) {
               </div>
             ) : null}
 
-            {typeof aiDecision.social_media_notes === "string" ? (
-              <p><span className="font-medium text-zinc-900">Social Media Notes:</span> {aiDecision.social_media_notes}</p>
-            ) : null}
           </div>
         ) : (
           <p className="mt-2 text-sm text-zinc-700">Screening in progress. AI decision will appear shortly.</p>
