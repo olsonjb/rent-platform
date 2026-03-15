@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { screenApplication } from "@/lib/agent/screening-agent";
+import { logScreeningEvent } from "@/lib/screening/audit-log";
 
 type JobStatus = "queued" | "processing" | "completed" | "failed";
 
@@ -153,13 +154,18 @@ async function fetchApplicationContext(applicationId: string) {
 async function saveScreeningResult(applicationId: string, decision: Record<string, unknown>): Promise<void> {
   const supabase = createServiceClient();
 
-  const newStatus = (decision as { approved?: boolean }).approved ? "approved" : "denied";
+  const aiRecommendation = (decision as { approved?: boolean }).approved ? "approved" : "denied";
+  const aiConfidence = typeof (decision as { confidence?: number }).confidence === "number"
+    ? Math.max(0, Math.min(1, (decision as { confidence: number }).confidence))
+    : null;
 
   const { error } = await supabase
     .from("rental_applications")
     .update({
       ai_decision: decision,
-      status: newStatus,
+      status: "ai_reviewed",
+      ai_recommendation: aiRecommendation,
+      ai_recommendation_confidence: aiConfidence,
       updated_at: new Date().toISOString(),
     })
     .eq("id", applicationId);
@@ -167,6 +173,12 @@ async function saveScreeningResult(applicationId: string, decision: Record<strin
   if (error) {
     throw new Error(`Unable to save screening result for application ${applicationId}: ${error.message}`);
   }
+
+  await logScreeningEvent(applicationId, "ai_decision", {
+    recommendation: aiRecommendation,
+    confidence: aiConfidence,
+    flags: (decision as { flags?: string[] }).flags ?? [],
+  });
 }
 
 export async function processQueuedApplicationScreenings(batchSize?: number) {
@@ -190,6 +202,8 @@ export async function processQueuedApplicationScreenings(batchSize?: number) {
         .from("rental_applications")
         .update({ status: "screening" })
         .eq("id", job.application_id);
+
+      await logScreeningEvent(job.application_id, "screening_started", {});
 
       const decision = await screenApplication(context);
       await saveScreeningResult(job.application_id, decision as unknown as Record<string, unknown>);
