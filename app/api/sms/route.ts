@@ -1,6 +1,8 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
-import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
+import { parseMaintenanceRequests } from "@/lib/chat/parse-maintenance";
+import { handleMaintenanceRequests } from "@/lib/chat/handle-maintenance";
+import { getConversationHistory } from "@/lib/chat/history";
 import { sendSms, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
 import { withAITracking } from "@/lib/ai-metrics";
 import { createLogger, withCorrelationId } from "@/lib/logger";
@@ -12,45 +14,6 @@ import twilio from "twilio";
 const baseLogger = createLogger("sms-api");
 
 const anthropic = new Anthropic();
-
-interface MaintenanceRequest {
-  issue: string;
-  urgency: "habitability" | "standard";
-}
-
-function parseMaintenanceRequests(
-  text: string
-): { displayText: string; maintenanceRequests: MaintenanceRequest[] } {
-  const delimiter = "|||MAINTENANCE_REQUEST|||";
-  const endDelimiter = "|||END|||";
-
-  const firstIdx = text.indexOf(delimiter);
-  if (firstIdx === -1) return { displayText: text.trim(), maintenanceRequests: [] };
-
-  const displayText = text.slice(0, firstIdx).trim();
-  const requests: MaintenanceRequest[] = [];
-
-  let searchFrom = 0;
-  while (true) {
-    const start = text.indexOf(delimiter, searchFrom);
-    if (start === -1) break;
-    const jsonStart = start + delimiter.length;
-    const end = text.indexOf(endDelimiter, jsonStart);
-    if (end === -1) break;
-    const jsonStr = text.slice(jsonStart, end).trim();
-    try {
-      const parsed = JSON.parse(jsonStr);
-      if (parsed.issue && parsed.urgency) {
-        requests.push(parsed as MaintenanceRequest);
-      }
-    } catch {
-      // ignore malformed block
-    }
-    searchFrom = end + endDelimiter.length;
-  }
-
-  return { displayText, maintenanceRequests: requests };
-}
 
 function twimlReply(message: string, correlationId?: string): NextResponse {
   const MessagingResponse = twilio.twiml.MessagingResponse;
@@ -101,21 +64,8 @@ export async function POST(request: NextRequest) {
     channel: "sms",
   });
 
-  // Load SMS conversation history only
-  const { data: history } = await supabase
-    .from("chat_messages")
-    .select("role, content")
-    .eq("tenant_id", tenant.id)
-    .eq("channel", "sms")
-    .order("created_at", { ascending: true })
-    .limit(30);
-
-  const messages: Anthropic.MessageParam[] = (history ?? []).map(
-    (msg: { role: string; content: string }) => ({
-      role: msg.role as "user" | "assistant",
-      content: msg.content,
-    })
-  );
+  // Load SMS conversation history (windowed)
+  const messages = await getConversationHistory(supabase, tenant.id, "sms");
 
   // Call Claude
   const systemPrompt = buildSystemPrompt({
@@ -149,35 +99,16 @@ export async function POST(request: NextRequest) {
   const { displayText, maintenanceRequests } = parseMaintenanceRequests(rawReply);
 
   // Insert all detected maintenance requests and notify landlord
-  let triggeredMaintenanceProcessor = false;
-  for (const mr of maintenanceRequests) {
-    const { error: maintenanceInsertError } = await supabase.from("maintenance_requests").insert({
-      tenant_id: tenant.id,
-      unit: tenant.unit,
-      issue: mr.issue,
-      urgency: mr.urgency,
-      status: "pending",
-    });
-
-    if (!maintenanceInsertError && !triggeredMaintenanceProcessor) {
-      triggerMaintenanceReviewProcessingInBackground();
-      triggeredMaintenanceProcessor = true;
-    }
-
-    if (property.manager_phone) {
-      const landlordMsg = buildLandlordSms({
-        propertyName: property.name,
-        unit: tenant.unit,
-        tenantName: tenant.name,
-        tenantPhone: tenant.phone ?? null,
-        issue: mr.issue,
-        urgency: mr.urgency,
-      });
-      await sendSms(property.manager_phone, landlordMsg).catch((err) =>
-        logger.error({ err }, "Failed to SMS landlord")
-      );
-    }
-  }
+  await handleMaintenanceRequests(maintenanceRequests, {
+    supabase,
+    tenantId: tenant.id,
+    unit: tenant.unit,
+    tenantName: tenant.name,
+    tenantPhone: tenant.phone ?? null,
+    propertyName: property.name,
+    managerPhone: property.manager_phone,
+    logger,
+  });
 
   // Save assistant reply
   await supabase.from("chat_messages").insert({
