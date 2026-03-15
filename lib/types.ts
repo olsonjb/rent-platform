@@ -130,3 +130,19 @@ export interface LeaseWithRelations extends Lease {
     email: string;
   };
 }
+
+export type RentInvoiceStatus = 'pending' | 'processing' | 'succeeded' | 'failed' | 'overdue';
+
+export interface RentInvoice {
+  id: string;
+  lease_id: string;
+  tenant_id: string;
+  landlord_id: string;
+  amount_cents: number;
+  platform_fee_cents: number;
+  status: RentInvoiceStatus;
+  due_date: string;
+  stripe_payment_intent_id: string | null;
+  created_at: string;
+  paid_at: string | null;
+}
