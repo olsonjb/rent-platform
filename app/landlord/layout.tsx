@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { shouldRedirectToOnboarding } from "@/lib/auth/onboarding-middleware";
 
 async function checkPaymentStatus() {
   const supabase = await createClient();
@@ -11,6 +12,12 @@ async function checkPaymentStatus() {
   } = await supabase.auth.getUser();
 
   if (!user) return redirect("/auth/login");
+
+  // Check onboarding completion first
+  const needsOnboarding = await shouldRedirectToOnboarding(user.id);
+  if (needsOnboarding) {
+    return redirect("/protected/onboarding");
+  }
 
   const svc = createServiceClient();
   const { data: profile } = await svc
