@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { buildSystemPrompt } from "@/lib/chat/system-prompt";
 import { triggerMaintenanceReviewProcessingInBackground } from "@/lib/maintenance-review-worker";
 import { sendSms, normalizeFromForLookup, buildLandlordSms } from "@/lib/twilio/sms";
+import { validateTwilioWebhook } from "@/lib/twilio/validate";
 import { withAITracking } from "@/lib/ai-metrics";
 import { createLogger, withCorrelationId } from "@/lib/logger";
 import { getCorrelationId } from "@/lib/correlation";
@@ -70,6 +71,12 @@ function twimlReply(message: string, correlationId?: string): NextResponse {
 }
 
 export async function POST(request: NextRequest) {
+  // Validate Twilio signature BEFORE any business logic
+  const validationError = await validateTwilioWebhook(request);
+  if (validationError) {
+    return validationError;
+  }
+
   const correlationId = getCorrelationId(request);
   const logger = withCorrelationId(baseLogger, correlationId);
 
