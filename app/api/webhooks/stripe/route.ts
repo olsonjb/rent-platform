@@ -3,6 +3,12 @@ import { getStripe, getStripeMode } from '@/lib/stripe';
 import { createServiceClient } from '@/lib/supabase/service';
 import { createLogger, withCorrelationId } from '@/lib/logger';
 import { getCorrelationId, setCorrelationIdHeader } from '@/lib/correlation';
+import {
+  rateLimit,
+  RATE_LIMIT_CONFIGS,
+  shouldBypass,
+  rateLimitHeaders,
+} from '@/lib/rate-limit';
 
 const baseLogger = createLogger('stripe-webhook');
 
@@ -14,6 +20,34 @@ const WEBHOOK_SECRETS = {
 export async function POST(req: NextRequest) {
   const correlationId = getCorrelationId(req);
   const logger = withCorrelationId(baseLogger, correlationId);
+
+  // Rate limiting: 30 requests per minute per IP
+  if (!shouldBypass(req.headers)) {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      ?? req.headers.get('x-real-ip')
+      ?? 'unknown';
+    const rlResult = await rateLimit(
+      `stripe:${ip}`,
+      RATE_LIMIT_CONFIGS.stripe,
+    );
+
+    if (!rlResult.allowed) {
+      const rlHeaders = rateLimitHeaders(rlResult, RATE_LIMIT_CONFIGS.stripe);
+      return setCorrelationIdHeader(
+        new NextResponse(
+          JSON.stringify({ error: 'Rate limit exceeded' }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              ...rlHeaders,
+            },
+          },
+        ),
+        correlationId,
+      );
+    }
+  }
 
   const stripe = getStripe();
   const mode = getStripeMode();
