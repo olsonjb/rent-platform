@@ -54,7 +54,6 @@ APPLICATION:
 - References: ${ctx.references.length > 0 ? ctx.references.map(r => `${r.name} (${r.relationship})`).join(', ') : 'None provided'}
 
 PROPERTY:
-- Address: ${ctx.propertyAddress}
 - Monthly Rent: $${ctx.monthlyRent.toFixed(2)}
 - Income-to-Rent Ratio: ${ctx.incomeRatio.toFixed(2)}x
 

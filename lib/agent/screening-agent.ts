@@ -51,7 +51,7 @@ export async function screenApplication(input: ScreeningInput): Promise<Screenin
     yearsRenting: input.application.years_renting,
     previousEvictions: input.application.previous_evictions,
     references: input.application.references,
-    socialMediaLinks: input.application.social_media_links,
+    socialMediaLinks: input.application.social_media_links ?? [],
     propertyAddress: input.property.address,
     monthlyRent: input.property.monthly_rent,
     incomeRatio,
