@@ -30,6 +30,14 @@ const parseBatchSize = (request: NextRequest): number | undefined => {
 };
 
 const isAuthorized = (request: NextRequest): boolean => {
+  // Accept X-Internal-Secret header
+  const internalSecret = request.headers.get("x-internal-secret");
+  const expectedInternalSecret = process.env.INTERNAL_API_SECRET;
+  if (internalSecret && expectedInternalSecret && internalSecret === expectedInternalSecret) {
+    return true;
+  }
+
+  // Accept Bearer token via Authorization header
   const authorization = request.headers.get("authorization");
   const allowed = getWorkerSecrets();
 
