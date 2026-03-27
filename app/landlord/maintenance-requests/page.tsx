@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import {
+  MAINTENANCE_REQUEST_STATUSES,
   MAINTENANCE_REQUEST_STATUS_LABELS,
   MAINTENANCE_REQUEST_URGENCY_LABELS,
   isMaintenanceRequestStatus,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/maintenance-requests";
 import { getUserRolesFromClaims } from "@/lib/auth/user-types";
 import { createClient } from "@/lib/supabase/server";
+import { updateMaintenanceRequestStatus } from "./actions";
 
 type MaintenanceReview = {
   estimated_cost_min: number;
@@ -203,9 +205,35 @@ async function LandlordMaintenanceRequestsContent() {
                     </p>
                     <p className="text-xs text-zinc-500">Submitted {formatDateTime(request.created_at)}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="w-full max-w-xs text-right sm:w-auto">
                     <p className="text-sm font-medium text-zinc-700">{urgencyLabel}</p>
                     <p className="text-xs uppercase tracking-[0.16em] text-zinc-500">{statusLabel}</p>
+                    <form action={updateMaintenanceRequestStatus} className="mt-2 flex items-center justify-end gap-2">
+                      <input type="hidden" name="requestId" value={request.id} />
+                      <label htmlFor={`status-${request.id}`} className="sr-only">
+                        Update status
+                      </label>
+                      <select
+                        id={`status-${request.id}`}
+                        name="status"
+                        defaultValue={
+                          isMaintenanceRequestStatus(request.status) ? request.status : "pending"
+                        }
+                        className="rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium uppercase tracking-[0.12em] text-zinc-700"
+                      >
+                        {MAINTENANCE_REQUEST_STATUSES.map((statusOption) => (
+                          <option key={statusOption} value={statusOption}>
+                            {MAINTENANCE_REQUEST_STATUS_LABELS[statusOption]}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="submit"
+                        className="inline-flex rounded-full border border-zinc-900/15 px-3 py-1.5 text-xs font-semibold text-zinc-800 transition hover:bg-zinc-100"
+                      >
+                        Save
+                      </button>
+                    </form>
                   </div>
                 </div>
 
