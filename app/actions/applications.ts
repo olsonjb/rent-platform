@@ -96,10 +96,13 @@ export async function submitApplication(formData: FormData) {
   });
 
   if (error) {
+    console.error("Application insert error:", JSON.stringify(error));
     if (error.code === "23505") {
       redirectWithError("You already have an active application for this property.");
     }
-    redirectWithError("Unable to submit application. Please try again.");
+    // TODO(debug): revert to generic message before going live — this leaks DB error codes to end users.
+    // Original: redirectWithError("Unable to submit application. Please try again.");
+    redirectWithError(`Unable to submit application. Please try again. (${error.code}: ${error.message})`);
   }
 
   triggerApplicationScreeningProcessingInBackground();
